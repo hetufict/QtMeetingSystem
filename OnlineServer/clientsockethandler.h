@@ -3,27 +3,12 @@
 
 #include <QObject>
 #include <QTcpSocket>
-#include <QThreadPool>
-#include <QRunnable>
 #include <QHash>
-#include "clienttask.h"
+#include <functional>
+#include "dbhelper.h"
 #include "messagepackage.h"
-struct currentFileDataStream  {
-    QString fileName;      // 文件名
-    qint64 size;          // 文件总大小
-    qint64 readSoFar;     // 已读取的数据大小
-    QByteArray fileData;  // 接收到的文件数据
-    QString reciever;//接受者
-    bool group;
-    // 重置结构体，以便开始接收新的文件数据
-    void reset() {
-        fileName.clear();
-        size = 0;
-        readSoFar = 0;
-        fileData.clear();
-        group=false;
-    }
-};
+
+using MsgHandler=std::function<void(MessagePackage& pack)>;
 
 class ClientSocketHandler : public QObject
 {
@@ -45,9 +30,8 @@ private slots:
     void onReadyRead();//客户端请求处理
     void onDisConnected();//客户端断开连接处理
 private:
-    void getFile(const MessagePackage& pack);//
-    void acceptFile();
     void handler(const MessagePackage& pack);//协议包请求类型判断
+    MsgHandler getHandler(QString msgType);
     void loginHandler(MessagePackage& pack);//登陆请求
     void logoutHandler(MessagePackage& pack);//登出请求
     void registerHandler(MessagePackage& pack);//注册请求
@@ -58,20 +42,19 @@ private:
     void groupChatHandler(MessagePackage& Pack);//群聊请求
     void getGroupMembersHandler(MessagePackage& pack);
     void privateFileHandler(MessagePackage& pack);//私聊文件
-    void handleReceivedFile(const QByteArray &fileData, const QString &fileName ,const QString &receiver);//处理接受到的文件
-    void getFileListHandler(MessagePackage& pack);
-    void getFileHandler(MessagePackage& pack);
-    void createMeetingHandler(MessagePackage& pack);
+    void getFileListHandler(MessagePackage& pack);//请求文件列表
+    void getFileHandler(MessagePackage& pack);//请求文件
+    void createMeetingHandler(MessagePackage& pack);//创建会议
     void inviteMeetingHandler(MessagePackage& pack);
     void joinMeetingHandler(MessagePackage& pack);
     void closeMeetingHandler(MessagePackage& pack);
     void membersListHandler(MessagePackage& pack);
     void fileDataHandler(MessagePackage& pack);
-    void writeToFile(const QString &path, const QByteArray &data);
-    void fileTransferCompleted(const QString &filePath);
+    void fileDataRequest(MessagePackage& pack);
     QTcpSocket * socket;
     QString username;
-    currentFileDataStream fileReader;
+    QHash<QString,MsgHandler> msgHanderMap;
+
     // 缓存文件数据的字典，键为文件路径，值为缓存的文件数据
     QHash<QString, QByteArray> fileBuffers;
     QHash<QString, qint64> fileReadSize;

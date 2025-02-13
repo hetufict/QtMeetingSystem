@@ -23,15 +23,18 @@ public:
     int getIntValue(QString key)const;
     void addValue(QString key,int value);
     //列表数据
-    QStringList getListValue(const QString& key);
+    QStringList getListValue(const QString& key)const;
     void addValue(QString key,QStringList values);
     //文件数据
+    //void addValue(const QString& key,const QString& filePath);
     void addValue(const QString &key, const QByteArray &fileData);
     QByteArray getFileValue(const QString& key) const;
     //发送包
     void sendMsg(QTcpSocket* socket);
     //接受包
     void recvMsg(QTcpSocket* socket);
+
+
     /***********键值类型变量**************/
     static QString Key_Type_Login;
     static QString Key_Type_Logout;
@@ -56,6 +59,9 @@ public:
     static QString Key_Type_CleanMeeting;
     static QString Key_Type_MembersList;
     static QString Key_Type_FILEDATA;
+    static QString Key_Type_FilePos;
+    static QString Key_Type_FileOK;
+    static QString Key_Type_FileDataRequest;
 
     static QString Key_Name;
     static QString Key_Pasd;

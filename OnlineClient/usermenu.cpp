@@ -190,6 +190,15 @@ void UserMenu::onReceiveGroupMembers(const MessagePackage &pack)
         chat->addGroupMembers(groupMembers);
     }
 }
+// 在 UserMenu 类中添加槽函数
+void UserMenu::onFileSendFinished() {
+    if (fileThrd) {
+        fileThrd->quit(); // 结束线程事件循环
+        fileThrd->wait(); // 等待线程结束
+        fileThrd = nullptr;
+        filehelper = nullptr;
+    }
+}
 
 void UserMenu::onFileSent(const QString &objname, const QString &filePath,bool group) {
     QFile file(filePath);
@@ -223,18 +232,20 @@ void UserMenu::onFileSent(const QString &objname, const QString &filePath,bool g
     if(filehelper==nullptr&&fileThrd==nullptr){
         filehelper=new FileHelper(true,group,filePath,fileName,username,objname);
         fileThrd=new QThread(this);
-        filehelper->moveToThread(fileThrd);
-        fileThrd->start();
 
         // 连接信号和槽，确保文件发送任务在新线程中执行
+        // 在 UserMenu 类中添加槽函数
         connect(this, &UserMenu::startFileSendSignal, filehelper, &FileHelper::fileDeal);
+        connect(filehelper, &FileHelper::fileSendFinished, this, &UserMenu::onFileSendFinished);
         connect(fileThrd, &QThread::finished, filehelper, &QObject::deleteLater);
         connect(fileThrd, &QThread::finished, fileThrd, &QObject::deleteLater);
 
+        filehelper->moveToThread(fileThrd);
         fileThrd->start();
-
         // 发送信号以启动文件发送任务
         emit startFileSendSignal();
+    }else{
+        QMessageBox::warning(mr_w,"文件上传","请先完成当前文件上传或下载");
     }
 }
 
@@ -321,9 +332,52 @@ void UserMenu::onRequestFile(const QString &filename, const QString &senderName,
     pack.sendMsg(socket);
 }
 
+//提示文件是否可以下载，预开辟文件空间，开辟线程，请求文件数据
 void UserMenu::onReceiveFile(const MessagePackage &pack)
 {
-    QMessageBox::information(this,"下载文件","下载文件成功");
+    //QString packSender=pack.getStringValue(MessagePackage::Key_Sender);
+    QString objname=pack.getStringValue(MessagePackage::Key_Receiver);
+    QString fileSender=pack.getStringValue(MessagePackage::Key_Name);
+    QString filename=pack.getStringValue(MessagePackage::key_FileName);
+    int group=pack.getIntValue(MessagePackage::Key_Result);
+    int filesize=pack.getIntValue(MessagePackage::key_FileSize);
+    QString path="./fileData/";
+    QString filePos=path+'/'+filename;
+    // 打开文件并预先分配磁盘空间
+    QFile file(filePos);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qDebug() << "无法打开文件" << filePos << "错误：" << file.errorString();
+        return;
+    }
+
+    // 预先分配文件大小
+    if (!file.resize(filesize)) {
+        qDebug() << "无法分配文件大小" << filesize << "字节，错误：" << file.errorString();
+        file.close();
+        return;
+    }
+    file.close();
+    // 请求文件数据
+    if(filehelper==nullptr&&fileThrd==nullptr){
+
+        //下载，群文件，文件路径，文件名，发送者，接受者
+        filehelper=new FileHelper(false,group,path,filename,fileSender,objname);
+        fileThrd=new QThread(this);
+        filehelper->setFileSize(filesize);
+        // 连接信号和槽，确保文件发送任务在新线程中执行
+        // 在 UserMenu 类中添加槽函数
+        connect(this, &UserMenu::startFileSendSignal, filehelper, &FileHelper::fileDeal);
+        connect(filehelper, &FileHelper::fileSendFinished, this, &UserMenu::onFileSendFinished);
+        connect(fileThrd, &QThread::finished, filehelper, &QObject::deleteLater);
+        connect(fileThrd, &QThread::finished, fileThrd, &QObject::deleteLater);
+        filehelper->moveToThread(fileThrd);
+        fileThrd->start();
+        // 发送信号以启动文件发送任务
+        emit startFileSendSignal();
+    }else{
+        QMessageBox::warning(mr_w,"文件下载","请先完成当前文件上传或下载");
+    }
+
 }
 
 void UserMenu::onCreateMeeting(const MessagePackage &pack)
@@ -523,6 +577,12 @@ void UserMenu::onMeetingMembersList(const MessagePackage &pack)
 
 void UserMenu::closeEvent(QCloseEvent *event)
 {
+    if (fileThrd) {
+        fileThrd->quit(); // 结束线程事件循环
+        fileThrd->wait(); // 等待线程结束
+        fileThrd = nullptr;
+        filehelper = nullptr;
+    }
     emit userMenuClosed(); // 发出信号
     QMainWindow::closeEvent(event);
 }

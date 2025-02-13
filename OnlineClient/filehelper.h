@@ -11,6 +11,8 @@ class FileHelper : public QObject
     Q_OBJECT
 public:
     explicit FileHelper(bool send,bool group,QString filePath,QString fileName,QString sender,QString recver,QObject *parent = nullptr);
+    ~FileHelper();
+    void setFileSize(const int& fileSize);
 public slots:
     void onError(QTcpSocket::SocketError socketError) {
         QTcpSocket::SocketState state = f_socket->state();
@@ -18,12 +20,17 @@ public slots:
         qDebug() << "Socket state: " << state;
     }
     void fileDeal();
-    void onBytesWritten(qint64 bytes);
+    void onReadyRead();
+signals:
+    void fileSendFinished();
 private:
+    void resultHandler(MessagePackage& pack);
     void fileSend();
     //void sendNextChunk();
     void fileRecv();
+    void fileDownload(MessagePackage& pack);
 private:
+    void initSocket();
     QTcpSocket* f_socket;
     bool send;
     bool pause=false;
@@ -32,15 +39,15 @@ private:
     QString sender;
     QString fileName;
     QString recver;
-    QFile file;
     qint64 fileSize;
     qint64 sentSize;
     QString logFileName;
-    QTextStream logStream;
+
+    QFile* file;
+    QFile* log;
 
     // 定义最大缓冲区大小
     static constexpr int MAX_BUFFER_SIZE = 1024 * 1024;  // 1 MB
-signals:
 };
 
 #endif // FILEHELPER_H

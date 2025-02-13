@@ -50,6 +50,7 @@ public slots:
     void onReceiveGroupMembers(const MessagePackage& pack);
     //接受聊天框文件信息
     void onFileSent(const QString& objname, const QString &filePath,bool group);
+    void onFileSendFinished();
     void onsendFileRespond(const MessagePackage& pack);//发送文件回复
     void onrecvPrivateFile(const MessagePackage& pack);//收到发送文件
     void onFlushFileList(const QString& objname,bool group);

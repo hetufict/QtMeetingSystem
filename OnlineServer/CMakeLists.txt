@@ -28,8 +28,9 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         servermanager.h servermanager.cpp
         clientsockethandler.h clientsockethandler.cpp
         messagepackage.h messagepackage.cpp
-        clienttask.h clienttask.cpp
+
         dbhelper.h dbhelper.cpp
+
 
 
     )

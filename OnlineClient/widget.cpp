@@ -117,9 +117,8 @@ void Widget::resultHandler(const MessagePackage &pack)
     {
         emit receiveFileList(pack);
     }
-    else if(pack.Type()==MessagePackage::Key_Type_GetFile)
+    else if(pack.Type()==MessagePackage::Key_Type_GetFile)//文件下载处理
     {
-        getFile(pack);
         emit receiveFile(pack);
     }
     else if(pack.Type()==MessagePackage::Key_Type_CreateMeeting)

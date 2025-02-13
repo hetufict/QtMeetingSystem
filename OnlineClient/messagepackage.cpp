@@ -1,28 +1,31 @@
 #include "messagepackage.h"
 #include <QDebug>
-QString MessagePackage::Key_Type_Login="user login";
-QString MessagePackage::Key_Type_Logout="user logout";
-QString MessagePackage::Key_Type_Register="user register";
+QString MessagePackage::Key_Type_Login="user_login";
+QString MessagePackage::Key_Type_Logout="user_logout";
+QString MessagePackage::Key_Type_Register="user-register";
 QString MessagePackage::Key_Type_UpdateList="update_list";
 QString MessagePackage::Key_Type_getOnlineUsr="get_user_list";
-QString MessagePackage::Key_Type_PrivateChat="user private chat";
-QString MessagePackage::Key_Type_AddGroup="add a Group";
-QString MessagePackage::Key_Type_AddGroupMembers="add a group member";
-QString MessagePackage::Key_Type_GetMyGroups="get my groups";
-QString MessagePackage::Key_Type_GetGroupMembers="get groupMembers";
-QString MessagePackage::Key_Type_InviteGroupMember="invite group member";
-QString MessagePackage::Key_Type_GroupChat="user group chat";
-QString MessagePackage::Key_Type_GroupFile="user group flie";
-QString MessagePackage::Key_Type_PrivateFile="user private flie";
-QString MessagePackage::Key_Type_GetFileList="get file list";
-QString MessagePackage::Key_Type_GetFile="get file";
+QString MessagePackage::Key_Type_PrivateChat="user_private_chat";
+QString MessagePackage::Key_Type_AddGroup="add_a_group";
+QString MessagePackage::Key_Type_AddGroupMembers="add_a_group_member";
+QString MessagePackage::Key_Type_GetMyGroups="get_my_groups";
+QString MessagePackage::Key_Type_GetGroupMembers="get_groupMembers";
+QString MessagePackage::Key_Type_InviteGroupMember="invite_group_member";
+QString MessagePackage::Key_Type_GroupChat="user_group_chat";
+QString MessagePackage::Key_Type_GroupFile="user_group_flie";
+QString MessagePackage::Key_Type_PrivateFile="user_private_flie";
+QString MessagePackage::Key_Type_GetFileList="get_file_list";
+QString MessagePackage::Key_Type_GetFile="get_file";
 QString MessagePackage::Key_Type_CreateMeeting="create_a_meeting";
-QString MessagePackage::Key_Type_InviteMeeting="invite to meeting";
-QString MessagePackage::Key_Type_JoinMeeting="join meeting";
-QString MessagePackage::Key_Type_CloseMeeting="close meeting";
-QString MessagePackage::Key_Type_CleanMeeting="clean meeting room";
+QString MessagePackage::Key_Type_InviteMeeting="invite_to_meeting";
+QString MessagePackage::Key_Type_JoinMeeting="join_meeting";
+QString MessagePackage::Key_Type_CloseMeeting="close_meeting";
+QString MessagePackage::Key_Type_CleanMeeting="clean_meeting_room";
 QString MessagePackage::Key_Type_MembersList="update_members_list";
-QString MessagePackage::Key_Type_FILEDATA="file data";
+QString MessagePackage::Key_Type_FILEDATA="__file_data";
+QString MessagePackage::Key_Type_FilePos="file_position";
+QString MessagePackage::Key_Type_FileOK="file_ok";
+QString MessagePackage::Key_Type_FileDataRequest="file_data_request";
 
 
 QString MessagePackage::Key_Name="name";
@@ -87,7 +90,12 @@ QString MessagePackage::Type()const
 //设置类型
 void MessagePackage::setType(QString type)
 {
-    m_data.insert("type",type);
+    //m_data.insert("type",type);
+    if(m_data.contains("type")){
+        m_data["type"]=type;
+    }else{
+        m_data.insert("type",type);
+    }
 }
 //读取字符数据
 QString MessagePackage::getStringValue(const QString& key)const
@@ -97,7 +105,12 @@ QString MessagePackage::getStringValue(const QString& key)const
 //添加字符数据
 void MessagePackage::addValue(QString key, QString value)
 {
-    m_data.insert(key,value);
+    //m_data.insert(key,value);
+    if(m_data.contains(key)){
+        m_data[key]=value;
+    }else{
+        m_data.insert(key,value);
+    }
 }
 //读取整形数据
 int MessagePackage::getIntValue(QString key)const
@@ -107,7 +120,12 @@ int MessagePackage::getIntValue(QString key)const
 //添加整形数据
 void MessagePackage::addValue(QString key, int value)
 {
-    m_data.insert(key,value);
+    //m_data.insert(key,value);
+    if(m_data.contains(key)){
+        m_data[key]=value;
+    }else{
+        m_data.insert(key,value);
+    }
 }
 //读取列表数据
 QStringList MessagePackage::getListValue(const QString& key)const
@@ -160,27 +178,98 @@ QByteArray MessagePackage::getFileValue(const QString& key) const {
     return QByteArray();
 }
 //发送协议包
-void MessagePackage::sendMsg(QTcpSocket *socket)
-{
-    //json转成QByteArray用于发送
+// void MessagePackage::sendMsg(QTcpSocket *socket)
+// {
+//     //json转成QByteArray用于发送
+//     QJsonDocument doc(m_data);
+//     QByteArray array=doc.toJson();
+//     //先发送长度，防止读取粘包的问题
+//     qint64 size=array.size();
+//     qDebug()<<"pack size:"<<size;
+//     socket->write((char*)&size,4);
+//     //再发送数据
+//     socket->write(array);
+// }
+
+// void MessagePackage::recvMsg(QTcpSocket *socket)
+// {
+//     //先读取长度，保证不对多读
+//     int len=0;
+//     socket->read((char*)&len,4);
+//     //再读取数据
+//     QByteArray arr=socket->read(len);
+//     //将数据转成json对象保存再类中
+//     m_data=QJsonDocument::fromJson(arr).object();
+// }
+
+
+void MessagePackage::sendMsg(QTcpSocket *socket) {
+    if (!socket || socket->state() != QAbstractSocket::ConnectedState) {
+        qDebug() << "Socket is not connected, cannot send data";
+        return;
+    }
+
+    // 将 JSON 数据转换为 QByteArray
     QJsonDocument doc(m_data);
-    QByteArray array=doc.toJson();
-    //先发送长度，防止读取粘包的问题
-    qint64 size=array.size();
-    qDebug()<<"pack size:"<<size;
-    socket->write((char*)&size,4);
-    //再发送数据
-    socket->write(array);
+    QByteArray jsonData = doc.toJson(QJsonDocument::Compact); // 使用紧凑格式减少数据量
+    qint32 dataSize = jsonData.size(); // 数据长度
+
+    // 使用 QDataStream 写入数据长度和数据
+    QByteArray packet;
+    QDataStream out(&packet, QIODevice::WriteOnly);
+    out.setVersion(QDataStream::Qt_DefaultCompiledVersion); // 设置版本以确保兼容性
+    out << dataSize; // 写入数据长度
+    out.writeRawData(jsonData.constData(), dataSize); // 写入数据
+
+    // 发送数据
+    qint64 bytesWritten = socket->write(packet);
+    if (bytesWritten == -1) {
+        qDebug() << "Failed to write data to socket:" << socket->errorString();
+    } else if (bytesWritten < packet.size()) {
+        qDebug() << "Partial data written, expected:" << packet.size() << "actual:" << bytesWritten;
+    } else {
+        qDebug() << "Data sent successfully, size:" << packet.size();
+    }
+
+    // 确保数据写入底层网络缓冲区
+    if (!socket->waitForBytesWritten(5000)) { // 超时5秒
+        qDebug() << "Failed to flush data to socket:" << socket->errorString();
+    }
 }
 
-void MessagePackage::recvMsg(QTcpSocket *socket)
-{
-    //先读取长度，保证不对多读
-    int len=0;
-    socket->read((char*)&len,4);
-    //再读取数据
-    QByteArray arr=socket->read(len);
-    //将数据转成json对象保存再类中
-    m_data=QJsonDocument::fromJson(arr).object();
+void MessagePackage::recvMsg(QTcpSocket *socket) {
+    // 缓冲区，用于存储接收到的数据
+    QByteArray buffer;
+
+    // 读取长度
+    while (buffer.size() < 4) {
+        QByteArray temp = socket->read(4 - buffer.size());
+        if (temp.isEmpty()) {
+            qDebug() << "Failed to read size, connection might be closed or no data available";
+            return;
+        }
+        buffer.append(temp);
+    }
+
+    // 解析长度
+    QDataStream in(&buffer, QIODevice::ReadOnly);
+    qint32 len = 0;
+    in >> len;
+
+    // 清空缓冲区，准备读取数据
+    buffer.clear();
+
+    // 读取数据
+    while (buffer.size() < len) {
+        QByteArray temp = socket->read(len - buffer.size());
+        if (temp.isEmpty()) {
+            qDebug() << "Failed to read data, connection might be closed or no data available";
+            return;
+        }
+        buffer.append(temp);
+    }
+
+    // 将数据转成 JSON 对象保存在类中
+    m_data = QJsonDocument::fromJson(buffer).object();
 }
 

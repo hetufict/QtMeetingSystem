@@ -59,6 +59,9 @@ public:
     static QString Key_Type_CleanMeeting;
     static QString Key_Type_MembersList;
     static QString Key_Type_FILEDATA;
+    static QString Key_Type_FilePos;
+    static QString Key_Type_FileOK;
+    static QString Key_Type_FileDataRequest;
 
     static QString Key_Name;
     static QString Key_Pasd;
