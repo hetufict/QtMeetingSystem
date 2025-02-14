@@ -6,7 +6,6 @@ VideoRecover::VideoRecover(int port,QObject *parent)
 {
     socket=new QUdpSocket(this);
     socket->bind(QHostAddress::AnyIPv4,port,QAbstractSocket::ReuseAddressHint);
-    //socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption,300*2048);//设置udp缓冲区
     socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, QVariant(300 * 2048));
     bool ret=socket->joinMulticastGroup(QHostAddress("224.0.1.0"));//组播地址
     if(!ret){
@@ -41,7 +40,6 @@ void VideoRecover::onReadyRead()
             }
             else
             {
-                //if(++i%30==0) qDebug()<<"recover:"<<i;
                 dataStream->writeRawData(pack.data,pack.packTaken);
             }
         }
@@ -54,8 +52,6 @@ void VideoRecover::onReadyRead()
 void VideoRecover::onStopVideoRecv()
 {
     isSpy=false;
-    //qDebug()<<"yes sir";
-    //QMetaObject::invokeMethod(vrecvThread, "quit", Qt::QueuedConnection);
     socket->abort();
     QThread::currentThread()->quit();
 }
