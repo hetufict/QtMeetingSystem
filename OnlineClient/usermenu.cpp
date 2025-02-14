@@ -16,12 +16,9 @@ UserMenu::UserMenu(QWidget *parent,QTcpSocket* socket,QString username)
     ,timer(nullptr)
 {
     ui->setupUi(this);
-    //timer=new QTimer(this);
-    //timer->start(3000);//定时器，定时刷新会议成员列表
     frameLayout=new QVBoxLayout;
     ui->frame->setLayout(frameLayout);
     updateUsrListRequest();
-    //connect(timer,&QTimer::timeout,this,&UserMenu::requestMeetingMembers);
     connect(ui->list_UserList,&QListWidget::itemDoubleClicked,this,&UserMenu::list_UserList_itemDoubleClicked);
 }
 
@@ -375,7 +372,7 @@ void UserMenu::onReceiveFile(const MessagePackage &pack)
         // 发送信号以启动文件发送任务
         emit startFileSendSignal();
     }else{
-        QMessageBox::warning(mr_w,"文件下载","请先完成当前文件上传或下载");
+        QMessageBox::warning(this,"文件下载","请先完成当前文件上传或下载");
     }
 
 }

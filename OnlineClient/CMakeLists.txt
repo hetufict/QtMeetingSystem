@@ -42,6 +42,11 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         videorecover.h videorecover.cpp
         videosender.h videosender.cpp
         filehelper.h filehelper.cpp
+        usrmenu.h usrmenu.cpp usrmenu.ui
+        meetiingmenu.h meetiingmenu.cpp meetiingmenu.ui
+        chatinfo.h chatinfo.cpp chatinfo.ui
+
+
 
     )
 # Define target properties for Android with Qt 6 as:
