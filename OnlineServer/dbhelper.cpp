@@ -1,6 +1,8 @@
 #include "dbhelper.h"
 #include <QDebug>
-
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QStringList>
 DBHelper* DBHelper::instance = nullptr;
 QMutex DBHelper::mutex;
 DBHelper *DBHelper::getInstance()
@@ -124,7 +126,44 @@ QStringList DBHelper::getUsers()
     QStringList list;
     while (query.next()) {
         list.append(query.value(0).toString());
-        //qDebug()<<query.value(0).toString();
+    }
+    return list;
+}
+
+QStringList DBHelper::getOnlineUsers()
+{
+    QSqlQuery query(db);
+    // 使用参数化查询（尽管在这个例子中不是必需的）
+    QString str = QString("SELECT name FROM %1 where online=1;").arg(userTableName);
+    qDebug() << "执行查询：" << str;
+
+    if (!query.exec(str)) {
+        qWarning() << "查询失败:" << query.lastError();
+        return QStringList(); // 查询失败时返回空列表
+    }
+
+    QStringList list;
+    while (query.next()) {
+        list.append(query.value(0).toString());
+    }
+    return list;
+}
+
+QStringList DBHelper::getOfflineUsers()
+{
+    QSqlQuery query(db);
+    // 使用参数化查询（尽管在这个例子中不是必需的）
+    QString str = QString("SELECT name FROM %1 where online=0;").arg(userTableName);
+    qDebug() << "执行查询：" << str;
+
+    if (!query.exec(str)) {
+        qWarning() << "查询失败:" << query.lastError();
+        return QStringList(); // 查询失败时返回空列表
+    }
+
+    QStringList list;
+    while (query.next()) {
+        list.append(query.value(0).toString());
     }
     return list;
 }
@@ -232,7 +271,7 @@ QStringList DBHelper::getFileList(const QString &user1, const QString &user2, bo
     QSqlQuery query(db);
     if(group){
         // 基础查询条件，用于找到双向关系中的文件
-        QString baseQuery = "SELECT filename FROM fileInfo WHERE receiver = :user2;";
+        QString baseQuery = "SELECT filename FROM fileInfo WHERE receiver = :user2 AND filetype = 'group';";
         query.prepare(baseQuery);
         query.bindValue(":user2", user2);
 
@@ -244,12 +283,18 @@ QStringList DBHelper::getFileList(const QString &user1, const QString &user2, bo
             qDebug() << "查询失败:" << query.lastError();
         }
     }else{
-        // 基础查询条件，用于找到双向关系中的文件
-        QString baseQuery = "SELECT filename FROM fileInfo WHERE (sender = :user1 AND receiver = :user2) OR "
-                            "(sender = :user2 AND receiver = :user1)";
-        query.prepare(baseQuery + " AND filetype = 'private'");
+        // 私聊文件查询优化
+        QString baseQuery =
+            "SELECT filename FROM fileInfo "
+            "WHERE filetype = 'private' "
+            "AND ("
+            "    (sender = :user1 AND receiver = :user2) OR "
+            "    (sender = :user2 AND receiver = :user1)"
+            ")";
+        query.prepare(baseQuery);
         query.bindValue(":user1", user1);
         query.bindValue(":user2", user2);
+
         if (query.exec()) {
             while (query.next()) {
                 fileList.append(query.value(0).toString());
@@ -262,12 +307,17 @@ QStringList DBHelper::getFileList(const QString &user1, const QString &user2, bo
     return fileList;
 }
 
+QStringList DBHelper::getFileList(const QString &groupName)
+{
+    return getFileList("",groupName,true);
+}
+
 QStringList DBHelper::getSenderList(const QStringList &fileList, const QString &user1, const QString &user2, bool group) {
     QStringList senderList;
     QSqlQuery query(db);
 
     if(group){
-        QString baseQuery = "SELECT sender FROM fileInfo WHERE receiver = :user2;";
+        QString baseQuery = "SELECT sender FROM fileInfo WHERE receiver = :user2 AND filetype = 'group';";
         query.prepare(baseQuery);
         query.bindValue(":user2", user2);
 
@@ -297,7 +347,11 @@ QStringList DBHelper::getSenderList(const QStringList &fileList, const QString &
         // 构建 SQL 查询字符串
         QString str = "SELECT sender FROM fileInfo "
                       "WHERE (" + fileCondition + ") "
-                                        "AND (sender = :user1 OR sender = :user2 OR receiver = :user1 OR receiver = :user2)";
+                                        "AND ("
+                                        "(sender = :user1 AND receiver  = :user2) OR"
+                                        "(sender = :user2 AND receiver = :user1)"
+                                        ")"
+                                        "AND filetype = 'private'";
         query.prepare(str);
         query.bindValue(":user1", user1);
         query.bindValue(":user2", user2);
@@ -536,10 +590,6 @@ int DBHelper::leaveMeeting(const int &meetingID, const QString &meetingName, con
         return 0; // 没有记录被更新
     }
 }
-
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QStringList>
 
 QStringList DBHelper::getMeetingMembers(const int &meetingID, const QString &meetingName) {
     QSqlQuery query(db);

@@ -21,7 +21,11 @@ public:
     QTcpServer* server;
     //客户段处理线程Map<处理线程对象指针,登陆用户名>
     QMap<ClientSocketHandler*,QString> clients;
-    //QList<ClientSocketHandler*> clients;
+    QMap<QString,ClientSocketHandler*> users;
+public slots:
+    void onUpdateLists();
+    void onUpdateGroupMemberList(const QString& groupName);
+    void onUpdateFileList(const QString& groupName);//更新群文件列表
 signals:
 
 private slots:

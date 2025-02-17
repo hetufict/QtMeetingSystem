@@ -9,11 +9,20 @@ ChatMenu::ChatMenu(QWidget *parent,bool group)
     , ui(new Ui::ChatMenu)
     ,objname("")
     ,group(group)
+    ,timer(new QTimer(this))
 {
     ui->setupUi(this);
     // 自动调整列宽以适应内容
     ui->tableWidget_files->resizeColumnsToContents();
     this->hide();
+    if(!group){
+        ui->label_3->hide();
+        ui->listWidget_info->hide();
+    }
+    timer->setSingleShot(true);
+    timer->setInterval(100);
+    connect(timer,&QTimer::timeout,this,&ChatMenu::getLists);
+    timer->start();
 }
 
 void ChatMenu::setObjName(const QString& name)
@@ -122,17 +131,6 @@ void ChatMenu::on_pb_sendFile_clicked() {
 }
 
 
-//刷新获取群员信息
-void ChatMenu::on_pb_flushgroupmember_clicked()
-{
-    emit flushGrroupMembers(objname);
-}
-
-
-void ChatMenu::on_pb_fllushFilelist_clicked()
-{
-    emit flushFileList(objname,group);
-}
 
 
 void ChatMenu::on_pb_downloadFile_clicked()
@@ -159,5 +157,13 @@ void ChatMenu::on_pb_downloadFile_clicked()
         // 如果没有选中的行，可以提示用户
         QMessageBox::information(this, tr("提示"), tr("请选择一个文件"));
     }
+}
+
+void ChatMenu::getLists()
+{
+    if(group){
+        emit flushGrroupMembers(objname);
+    }
+    emit flushFileList(objname,group);
 }
 

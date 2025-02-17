@@ -18,6 +18,8 @@ public:
     bool userIsOnline(const QString& name);//查看用户是否在线
     bool userOffline(const QString& name);//设置用户离线状态
     QStringList getUsers();
+    QStringList getOnlineUsers();
+    QStringList getOfflineUsers();
 
     //群组操作
     bool addGroup(const QString& groupname);//添加新群组
@@ -29,6 +31,7 @@ public:
     void addFile(const QString& fliePath,const QString& flieName,const QString& flieType,
                  const QString& flieSender,const QString& flieReceiver,const int& flieSize);
     QStringList getFileList(const QString &user1, const QString &user2,bool group);
+    QStringList getFileList(const QString &groupName);
     QStringList getSenderList(const QStringList &fileList, const QString &user1, const QString &user2,bool group);
 
     //会议

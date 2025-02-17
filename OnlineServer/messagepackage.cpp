@@ -26,6 +26,7 @@ QString MessagePackage::Key_Type_FILEDATA="__file_data";
 QString MessagePackage::Key_Type_FilePos="file_position";
 QString MessagePackage::Key_Type_FileOK="file_ok";
 QString MessagePackage::Key_Type_FileDataRequest="file_data_request";
+QString MessagePackage::Key_Type_UpdateLists="update_lists";
 
 
 QString MessagePackage::Key_Name="name";
@@ -53,6 +54,9 @@ QString MessagePackage::Key_MeetingMembersIn="membersin";
 QString MessagePackage::Key_MeetingMembersAbsent="membersabsent";
 QString MessagePackage::Key_MeetingMembersLeave="membersleave";
 QString MessagePackage::Key_SentSize="filesentsize";
+QString MessagePackage::Key_OnlineUsers="OnlineUsers";
+QString MessagePackage::Key_OfflineUsers="OfflineUsers";
+
 MessagePackage::MessagePackage(const char *data, int size)
 {
     if (data != nullptr && size > 0)

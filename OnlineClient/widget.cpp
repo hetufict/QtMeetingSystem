@@ -100,7 +100,7 @@ void Widget::resultHandler(const MessagePackage &pack)
     {
         emit receiveGroupMembers(pack);
     }
-    else if(pack.Type()==MessagePackage::Key_Type_PrivateFile)
+    else if(pack.Type()==MessagePackage::Key_Type_FileOK)//发送文件的结果回复
     {
         if(pack.getStringValue(MessagePackage::Key_Sender)==usrMenu->getUsername())
         {
@@ -152,6 +152,8 @@ void Widget::resultHandler(const MessagePackage &pack)
     }else if(pack.Type()==MessagePackage::Key_Type_MembersList)
     {
         emit meetingMembersList(pack);
+    }else if(pack.Type()==MessagePackage::Key_Type_UpdateLists){
+        emit updateLists(pack);
     }
 
 }
@@ -213,6 +215,9 @@ void Widget::adminConnectUserMenu()
     connect(this,&Widget::recvPrivateFile,usrMenu->getChatObj(),&ChatInfo::onrecvPrivateFile);
     connect(this,&Widget::receiveFileList,usrMenu->getChatObj(),&ChatInfo::onReceiveFileList);
     connect(this,&Widget::receiveFile,usrMenu->getChatObj(),&ChatInfo::onReceiveFile);
+    connect(this,&Widget::updateLists,usrMenu->getChatObj(),&ChatInfo::onUpdateLists);
+
+
     connect(this,&Widget::createMeeting,usrMenu->getMeetingObj(),&MeetiingMenu::onCreateMeeting);
     connect(this,&Widget::inviteMeetingRespond,usrMenu->getMeetingObj(),&MeetiingMenu::onInviteMeetingRespond);
     connect(this,&Widget::getMeetingInvitation,usrMenu->getMeetingObj(),&MeetiingMenu::onGetMeetingInvitation);

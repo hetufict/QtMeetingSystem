@@ -276,7 +276,8 @@ void ClientSocketHandler::fileDataHandler(MessagePackage &pack)
     //设置文件存储路径
     QString path="./fileData/";
     QString filePath;
-    if(pack.getIntValue(MessagePackage::Key_Result)==1){
+    int group=pack.getIntValue(MessagePackage::Key_Result)==1;
+    if(group){
         filePath="group";
     }
     else{
@@ -310,20 +311,24 @@ void ClientSocketHandler::fileDataHandler(MessagePackage &pack)
         respack.addValue(MessagePackage::key_FileName, fileName); // 发送的文件名
         respack.addValue(MessagePackage::key_FileSize,sentSize);//已经发送的大小
         respack.sendMsg(socket); // 回发送消息
-        //respack.addValue(MessagePackage::Key_Result, 0); // 区分发送者和接受者
-        //qDebug() << "send file result to" << sender;
     }
     else if (sentSize== filesize){//如果文件上传完成
         //设置回发数据包，(发送者上传成功应答，接受者获得文件信息)
         MessagePackage respack;
         respack.setType(MessagePackage::Key_Type_FileOK); // 设置发送包类型
+        QStringList filelist=DBHelper::getInstance()->getFileList(sender,receiver,group);
+        QStringList senderList=DBHelper::getInstance()->getSenderList(filelist,sender,receiver,group);
+        respack.addValue(MessagePackage::key_FileList,filelist);
+        respack.addValue(MessagePackage::key_SenderList,senderList);
         respack.addValue(MessagePackage::Key_Sender, sender); // 发送者
         respack.addValue(MessagePackage::Key_Receiver, receiver); // 发送对象
         respack.addValue(MessagePackage::key_FileName, fileName); // 发送的文件名
         respack.sendMsg(socket); // 发送消息
         respack.addValue(MessagePackage::Key_Result, 0); // 区分发送者和接受者
         qDebug() << "send file result to" << sender;
-        emit privateFile(respack);
+        if(group) emit updateFileList(receiver);
+        else emit privateFile(respack);
+
     }
 }
 
@@ -426,7 +431,8 @@ void ClientSocketHandler::loginHandler(MessagePackage &pack)
     if(pack.getIntValue("result")==1)
     {
         username=name;
-        emit setClientName(this,name);
+        emit setClientName(this,name);//设置server管理客户端的map
+        emit updateLists();//更新用户列表
     }
 
 }
@@ -434,15 +440,16 @@ void ClientSocketHandler::loginHandler(MessagePackage &pack)
 void ClientSocketHandler::logoutHandler(MessagePackage &pack)
 {
     DBHelper::getInstance()->userOffline(username);
+    emit updateLists();//更新用户列表
 }
 
 void ClientSocketHandler::registerHandler(MessagePackage &pack)
 {
-    QString name=pack.getStringValue("name");
-    QString pswd=pack.getStringValue("pswd");
+    QString name=pack.getStringValue(MessagePackage::Key_Name);
+    QString pswd=pack.getStringValue(MessagePackage::Key_Pasd);
     int ret=DBHelper::getInstance()->userRegister(name,pswd);
     pack.addValue("result",ret);
-    //qDebug()<<"name:"<<name<<" pswd:"<<pswd<<"result:"<<pack.getIntValue("result");
+    if(ret) emit updateLists();//更新用户列表
     pack.sendMsg(socket);
 }
 
@@ -450,7 +457,7 @@ void ClientSocketHandler::updateUserListHandler(MessagePackage &pack)
 {
     //qDebug()<<"name:"<<pack.getStringValue("name")<<" type:"<<pack.Type();
     QStringList list=DBHelper::getInstance()->getUsers();
-    QStringList listg=DBHelper::getInstance()->getGroupNames(pack.getStringValue("name"));
+    QStringList listg=DBHelper::getInstance()->getGroupNames(pack.getStringValue(MessagePackage::Key_Name));
     pack.addValue(MessagePackage::Key_UserList,list);
     pack.addValue(MessagePackage::Key_UserGroupList,listg);
     pack.sendMsg(socket);
@@ -470,6 +477,7 @@ void ClientSocketHandler::addGroupHandler(MessagePackage &pack)
     DBHelper::getInstance()->addGroupMember(groupName,name);
     pack.addValue(MessagePackage::Key_Result,ret);
     pack.sendMsg(socket);
+    emit updateLists();//更新用户列表
 }
 
 void ClientSocketHandler::inviteGroupHandler(MessagePackage &pack)
@@ -478,6 +486,8 @@ void ClientSocketHandler::inviteGroupHandler(MessagePackage &pack)
     QString name=pack.getStringValue(MessagePackage::Key_Name);
     DBHelper::getInstance()->addGroupMember(groupName,name);
     pack.sendMsg(socket);
+    emit updateLists();//更新用户列表
+    emit updateGroupMemberList(groupName);//更新用户群聊用户列表
 }
 
 void ClientSocketHandler::groupChatHandler(MessagePackage &Pack)

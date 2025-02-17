@@ -19,6 +19,60 @@ void ServerManager::removeInstance()
     delete instance;
     instance = nullptr;
 }
+
+void ServerManager::onUpdateLists() {
+    MessagePackage pack;
+    QStringList onlineUsers = DBHelper::getInstance()->getOnlineUsers(); // 在线用户
+    QStringList offlineUsers = DBHelper::getInstance()->getOfflineUsers(); // 离线用户
+    pack.setType(MessagePackage::Key_Type_UpdateLists);
+    pack.addValue(MessagePackage::Key_OnlineUsers, onlineUsers);
+    pack.addValue(MessagePackage::Key_OfflineUsers, offlineUsers);
+
+    for (QMap<ClientSocketHandler*, QString>::const_iterator it = clients.constBegin(); it != clients.constEnd(); ++it) {
+        ClientSocketHandler* handler = it.key(); // 获取键（ClientSocketHandler*）
+        QString username = it.value(); // 获取值（QString）
+        QStringList mygroups = DBHelper::getInstance()->getGroupNames(username);//用户加入的群组
+        pack.addValue(MessagePackage::Key_UserGroupList, mygroups);
+
+        // 发送消息包到客户端
+        pack.sendMsg(handler->getSocket());
+    }
+}
+
+void ServerManager::onUpdateGroupMemberList(const QString& groupName)
+{
+    //获取所有群组成员
+    QStringList groupMembers=DBHelper::getInstance()->getGroupMembers(groupName);
+    //遍历群员列表，发送群组成员信息
+    for(const auto& it:groupMembers){
+        MessagePackage pack;
+        pack.setType(MessagePackage::Key_Type_GetGroupMembers);
+        pack.addValue(MessagePackage::Key_UserList,groupMembers);
+        if(users.contains(it)){
+            pack.sendMsg(users[it]->getSocket());
+        }
+    }
+}
+
+void ServerManager::onUpdateFileList(const QString &groupName)
+{
+    //获取所有群组成员
+    QStringList groupMembers=DBHelper::getInstance()->getGroupMembers(groupName);
+    QStringList filelist=DBHelper::getInstance()->getFileList(groupName);
+    QStringList senderlist=DBHelper::getInstance()->getSenderList(filelist,"",groupName,true);
+    qDebug()<<"filelist size:"<<filelist.size()<<" sendlerlist size:"<<senderlist.size();
+    //遍历群员列表，发送群组成员信息
+    for(const auto& it:groupMembers){
+        MessagePackage pack;
+        pack.setType(MessagePackage::Key_Type_GetFileList);
+        pack.addValue(MessagePackage::key_FileList,filelist);
+        pack.addValue(MessagePackage::key_SenderList,senderlist);
+        pack.addValue(MessagePackage::Key_Name,groupName);
+        if(users.contains(it)){
+            pack.sendMsg(users[it]->getSocket());
+        }
+    }
+}
 void ServerManager::onNewConnection()
 {
     //同意客户端连接，并获取客户端套接字
@@ -39,18 +93,26 @@ void ServerManager::onNewConnection()
     connect(handler,&ClientSocketHandler::privateFile,this,&ServerManager::onPrivateFile);
     connect(handler,&ClientSocketHandler::inviteMeeting,this,&ServerManager::onInviteMeeting);
     connect(handler,&ClientSocketHandler::cleanMeeting,this,&ServerManager::onCleanMeeting);
+    connect(handler,&ClientSocketHandler::updateLists,this,&ServerManager::onUpdateLists);
+    connect(handler,&ClientSocketHandler::updateGroupMemberList,this,&ServerManager::onUpdateGroupMemberList);
+    connect(handler,&ClientSocketHandler::updateFileList,this,&ServerManager::onUpdateFileList);
 }
 
 void ServerManager::recvClientName(ClientSocketHandler* handler,const QString& name)
 {
     clients[handler]=name;
+    users[name]=handler;
     //qDebug()<<"set handler name :"<<clients[handler];
 }
 
 void ServerManager::onClientOffline(ClientSocketHandler *handler)
 {
-    //将handler移出map容器
+    //将handler和user移出map容器
     auto it=clients.constFind(handler);
+    auto user=users.constFind(it.value());
+    if(user!=users.constEnd()){
+        users.erase(user);
+    }
     if(it!=clients.constEnd())
     {
         clients.erase(it);
@@ -101,15 +163,16 @@ void ServerManager::onPrivateFile(MessagePackage &pack)
 {
     QString recver=pack.getStringValue(MessagePackage::Key_Receiver);
     //qDebug() << "send to reading" << recver;
-    for(auto handler=clients.begin();handler!=clients.end();handler++)
-    {
-        if(handler.key()->getLoginUser()==recver)
-        {
-            qDebug() << "send fileinfo to" << recver;
-            pack.sendMsg(handler.key()->getSocket());
-            break;
-        }
-    }
+    pack.sendMsg(users[recver]->getSocket());
+    // for(auto handler=clients.begin();handler!=clients.end();handler++)
+    // {
+    //     if(handler.key()->getLoginUser()==recver)
+    //     {
+    //         qDebug() << "send fileinfo to" << recver;
+    //         pack.sendMsg(handler.key()->getSocket());
+    //         break;
+    //     }
+    // }
 }
 
 void ServerManager::onInviteMeeting(MessagePackage &pack)

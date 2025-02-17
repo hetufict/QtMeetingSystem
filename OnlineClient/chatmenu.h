@@ -2,6 +2,7 @@
 #define CHATMENU_H
 
 #include <QWidget>
+#include <QTimer>
 #include "messagepackage.h"
 namespace Ui {
 class ChatMenu;
@@ -43,16 +44,14 @@ private slots:
     //点击发送文件
     void on_pb_sendFile_clicked();
 
-    void on_pb_flushgroupmember_clicked();
-
-    void on_pb_fllushFilelist_clicked();
-
     void on_pb_downloadFile_clicked();
 
 private:
+    void getLists();//获取列表
     //聊天对象用户名或群名
     QString objname;
     bool group;//true为群组聊天界面，false为用户聊天界面
+    QTimer* timer;
 };
 
 #endif // CHATMENU_H

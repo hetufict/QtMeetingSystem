@@ -42,8 +42,10 @@ public slots:
     void onReceiveGroupChat(const MessagePackage& pack);
     //获得群成员列表
     void onReceiveGroupMembers(const MessagePackage& pack);
-    //接受聊天框文件信息
+    //接受聊天框文件信息，启动文件线程开启文件传输
     void onFileSent(const QString& objname, const QString &filePath,bool group);
+    //更新用户和群组列表
+    void onUpdateLists(const MessagePackage& pack);
     //文件线程结束处理
     void onFileSendFinished();
     void onsendFileRespond(const MessagePackage& pack);//发送文件回复
@@ -55,8 +57,6 @@ public slots:
 protected:
 private slots:
     void list_UserList_itemDoubleClicked(QListWidgetItem *item);
-
-    void on_pb_refllushList_clicked();
 
     void on_pb_newgroup_clicked();
 

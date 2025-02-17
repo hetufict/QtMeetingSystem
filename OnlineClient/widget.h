@@ -37,6 +37,7 @@ signals:
     void meetingClosed(const MessagePackage& pack);
     void meetingExit(const MessagePackage& pack);
     void meetingMembersList(const MessagePackage& pack);
+    void updateLists(const MessagePackage& pack);
 private slots:
     void onReadyRead();
     void on_pb_login_clicked();

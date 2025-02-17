@@ -26,6 +26,9 @@ signals:
     void privateFile(MessagePackage& pack);
     void inviteMeeting(MessagePackage& pack);//邀请会议成员
     void cleanMeeting(MessagePackage& pack);//清理会议成员
+    void updateLists();
+    void updateGroupMemberList(const QString& groupName);
+    void updateFileList(const QString& receiver);
 private slots:
     void onReadyRead();//客户端请求处理
     void onDisConnected();//客户端断开连接处理

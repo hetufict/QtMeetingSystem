@@ -62,6 +62,9 @@ public:
     static QString Key_Type_FilePos;
     static QString Key_Type_FileOK;
     static QString Key_Type_FileDataRequest;
+    static QString Key_Type_UpdateLists;
+    static QString Key_OnlineUsers;
+    static QString Key_OfflineUsers;
 
     static QString Key_Name;
     static QString Key_Pasd;

@@ -16,7 +16,7 @@ ChatInfo::ChatInfo(QWidget *parent,QTcpSocket* socket,QString username)
     ui->setupUi(this);
     frameLayout=new QVBoxLayout;
     ui->frame->setLayout(frameLayout);
-    updateUsrListRequest();
+    //updateUsrListRequest();
     connect(ui->list_UserList,&QListWidget::itemDoubleClicked,this,&ChatInfo::list_UserList_itemDoubleClicked);
 }
 
@@ -231,31 +231,90 @@ void ChatInfo::onFileSent(const QString &objname, const QString &filePath,bool g
     }
 }
 
+void ChatInfo::onUpdateLists(const MessagePackage &pack) {
+    // 清空当前列表
+    ui->list_UserList->clear();
+    ui->list_groupList->clear();
+
+    // 获取在线用户和离线用户列表
+    QStringList onlineUsers = pack.getListValue(MessagePackage::Key_OnlineUsers);
+    QStringList offlineUsers = pack.getListValue(MessagePackage::Key_OfflineUsers);
+    QStringList listgroup = pack.getListValue(MessagePackage::Key_UserGroupList);
+    // 设置成员在会议中的背景色
+    QColor colorOnline = QColor(0, 255, 0); // 绿色
+    // 设置成员离开会议的背景色
+    QColor colorOffline = QColor(255, 165, 0); // 橙色
+
+    // 添加在线用户到用户列表（绿色）
+    for (const auto& user : onlineUsers) {
+        QListWidgetItem* item = new QListWidgetItem(user);
+        item->setBackground(QBrush(colorOnline ));
+        item->setTextAlignment(Qt::AlignCenter); // 设置文本居中
+        ui->list_UserList->addItem(item);
+    }
+    // 添加离线用户到用户列表（黄色）
+    for (const auto& user : offlineUsers) {
+        QListWidgetItem* item = new QListWidgetItem(user);
+        item->setBackground(QBrush(colorOffline));
+        item->setTextAlignment(Qt::AlignCenter); // 设置文本居中
+        ui->list_UserList->addItem(item);
+    }
+    // 添加群组到群组列表
+    for (const auto& group : listgroup) {
+        QListWidgetItem* item = new QListWidgetItem(group);
+        item->setTextAlignment(Qt::AlignCenter); // 设置文本居中
+        ui->list_groupList->addItem(item);
+    }
+}
+
 void ChatInfo::onsendFileRespond(const MessagePackage &pack)
 {
     QString filename=pack.getStringValue(MessagePackage::key_FileName);
+    QString receiver=pack.getStringValue(MessagePackage::Key_Receiver);//消息发送的对象
+    QStringList filelist=pack.getListValue(MessagePackage::key_FileList);
+    QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
+    QString objGroup=receiver;
+    auto it = chatList.find(receiver);
+    if(it!=chatList.end())
+    {
+        ChatMenu* chat=it.value();
+        chat->addFileList(filelist,senderlist);
+    }
+    else
+    {
+        // 如果没有找到，创建一个新的 ChatMenu
+        ChatMenu* chat = addNewChatMenu(true);
+        chat->setObjName(objGroup); // 设置聊天对象名称
+        // 将新的 ChatMenu 添加到 chatList 中
+        chatList.insert(objGroup, chat);
+        chat->addFileList(filelist,senderlist);
+    }
     QMessageBox::information(this,"发送文件","发送文件"+filename+"成功");
 }
 
 void ChatInfo::onrecvPrivateFile(const MessagePackage &pack)
 {
-    QString sender=pack.getStringValue(MessagePackage::Key_Sender);//文件发送者
-    QString filename=pack.getStringValue(MessagePackage::key_FileName);
-    auto it = chatList.find(sender);
+    //QString filename=pack.getStringValue(MessagePackage::key_FileName);
+    QString receiver=pack.getStringValue(MessagePackage::Key_Sender);//消息发送的对象
+    QStringList filelist=pack.getListValue(MessagePackage::key_FileList);
+    QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
+    QString objGroup=receiver;
+    auto it = chatList.find(receiver);
     if(it!=chatList.end())
     {
         ChatMenu* chat=it.value();
-        chat->addFile(filename);
+        chat->addFileList(filelist,senderlist);
     }
     else
     {
         // 如果没有找到，创建一个新的 ChatMenu
-        ChatMenu* chat = addNewChatMenu(false);
-        chat->setObjName(sender); // 设置聊天对象名称
+        ChatMenu* chat = addNewChatMenu(true);
+        chat->setObjName(objGroup); // 设置聊天对象名称
         // 将新的 ChatMenu 添加到 chatList 中
-        chatList.insert(sender, chat);
-        chat->addFile(filename);
+        chatList.insert(objGroup, chat);
+        chat->addFileList(filelist,senderlist);
     }
+    //QMessageBox::information(this,"发送文件","发送文件"+filename+"成功");
 }
 
 void ChatInfo::onFlushFileList(const QString &objname,bool group)
@@ -394,11 +453,6 @@ void ChatInfo::list_UserList_itemDoubleClicked(QListWidgetItem *item)
         // 更新当前活动的 ChatMenu
         curMenu = chat;
     }
-}
-
-void ChatInfo::on_pb_refllushList_clicked()
-{
-    updateUsrListRequest();
 }
 
 void ChatInfo::on_pb_newgroup_clicked()
