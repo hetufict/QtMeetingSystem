@@ -19,13 +19,6 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_4">
        <item>
-        <widget class="QLabel" name="label_objName">
-         <property name="text">
-          <string>聊天对象</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <spacer name="horizontalSpacer">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
@@ -39,9 +32,9 @@
         </spacer>
        </item>
        <item>
-        <widget class="QLabel" name="label">
+        <widget class="QLabel" name="label_objName">
          <property name="text">
-          <string>TextLabel</string>
+          <string>聊天对象</string>
          </property>
         </widget>
        </item>
@@ -57,13 +50,6 @@
           </size>
          </property>
         </spacer>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_2">
-         <property name="text">
-          <string>TextLabel</string>
-         </property>
-        </widget>
        </item>
       </layout>
      </item>
@@ -82,6 +68,16 @@
        <item>
         <layout class="QVBoxLayout" name="verticalLayout_2">
          <item>
+          <widget class="QLabel" name="label_speed">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
           <layout class="QHBoxLayout" name="horizontalLayout_7">
            <item>
             <widget class="QTableWidget" name="tableWidget_files">
@@ -97,6 +93,9 @@
                <height>16777215</height>
               </size>
              </property>
+             <property name="autoFillBackground">
+              <bool>false</bool>
+             </property>
              <column>
               <property name="text">
                <string>上传者</string>
@@ -111,19 +110,6 @@
            </item>
            <item>
             <layout class="QVBoxLayout" name="verticalLayout_6">
-             <item>
-              <widget class="QPushButton" name="pb_fllushFilelist">
-               <property name="minimumSize">
-                <size>
-                 <width>25</width>
-                 <height>0</height>
-                </size>
-               </property>
-               <property name="text">
-                <string>刷新</string>
-               </property>
-              </widget>
-             </item>
              <item>
               <widget class="QPushButton" name="pb_downloadFile">
                <property name="minimumSize">
@@ -159,7 +145,7 @@
                 </size>
                </property>
                <property name="text">
-                <string>暂停下载</string>
+                <string>暂停</string>
                </property>
               </widget>
              </item>

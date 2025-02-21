@@ -15,7 +15,6 @@ class ChatInfo;
 class ChatInfo : public QWidget
 {
     Q_OBJECT
-
 public:
     explicit ChatInfo(QWidget *parent = nullptr,QTcpSocket* socket=nullptr,QString username="");
     ~ChatInfo();
@@ -25,6 +24,11 @@ public:
 signals:
     void userMenuClosed(); // 当 UserMenu 关闭时发出的信号
     void startFileSendSignal();
+    void cancelFile();
+    void pauseFile();
+    void updateFileSpeed(double progressPercentage,double speed,QString fileName,bool send);
+    void finishedFile(QString fileName,bool send);
+    void setCancelFile(QString fileName,bool send);
 public slots:
     //更新用户列表
     void updateUserList(const MessagePackage& pack);
@@ -47,13 +51,16 @@ public slots:
     //更新用户和群组列表
     void onUpdateLists(const MessagePackage& pack);
     //文件线程结束处理
-    void onFileSendFinished();
+    void onFileSendFinished(MessagePackage& pack);
     void onsendFileRespond(const MessagePackage& pack);//发送文件回复
     void onrecvPrivateFile(const MessagePackage& pack);//收到发送文件
     void onFlushFileList(const QString& objname,bool group);//获取文件列表
     void onReceiveFileList(const MessagePackage& pack);//收到文件列表
     void onRequestFile(const QString& filename,const QString& senderName, const QString &objName,bool group);//请求文件
     void onReceiveFile(const MessagePackage& pack);//下载文件回复包
+    void onCancelFile();//取消当前文件操作
+    void onPauseFile();//暂停当前文件操作
+    void onFileSpeed(double progressPercentage,double speed,QString fileName,bool send);
 protected:
 private slots:
     void list_UserList_itemDoubleClicked(QListWidgetItem *item);
@@ -62,7 +69,15 @@ private slots:
 
     void on_list_groupList_itemDoubleClicked(QListWidgetItem *item);
 private:
+    //新建聊天窗口
     ChatMenu* addNewChatMenu(bool group);
+    //false,group,path,filename,fileSender,objname
+    //创建文件传输线程
+    void createFilehelper(const bool &send, const bool &group, const QString &filePath,
+                          const QString& filename, const QString &sender, const QString &recer,
+                          const qint64& fileSize);
+    //恢复文件传输
+    void recoverFileProcess();
     QTcpSocket* socket;
     QString username;
     QMap<QString,ChatMenu*> chatList;

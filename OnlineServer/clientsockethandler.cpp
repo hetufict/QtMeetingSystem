@@ -54,6 +54,8 @@ ClientSocketHandler::ClientSocketHandler(QTcpSocket *socket, QObject *parent) :
     msgHanderMap.insert(MessagePackage::Key_Type_FILEDATA,std::bind(&ClientSocketHandler::fileDataHandler,this,std::placeholders::_1));
     //文件下载
     msgHanderMap.insert(MessagePackage::Key_Type_FileDataRequest,std::bind(&ClientSocketHandler::fileDataRequest,this,std::placeholders::_1));
+    //文件取消上传
+    msgHanderMap.insert(MessagePackage::Key_Type_CancelUpload,std::bind(&ClientSocketHandler::fileCancelUpload,this,std::placeholders::_1));
 }
 
 ClientSocketHandler::~ClientSocketHandler()
@@ -313,6 +315,16 @@ void ClientSocketHandler::fileDataHandler(MessagePackage &pack)
         respack.sendMsg(socket); // 回发送消息
     }
     else if (sentSize== filesize){//如果文件上传完成
+        if(group==0){//加入数据库中
+            QString filePath="private"+sender+receiver+fileName;
+            path+=filePath;
+            DBHelper::getInstance()->addFile(path,fileName,"private",sender,receiver,filesize);
+        }
+        else{
+            QString filePath="group"+sender+receiver+fileName;
+            path+=filePath;
+            DBHelper::getInstance()->addFile(path,fileName,"group",sender,receiver,filesize);
+        }
         //设置回发数据包，(发送者上传成功应答，接受者获得文件信息)
         MessagePackage respack;
         respack.setType(MessagePackage::Key_Type_FileOK); // 设置发送包类型
@@ -320,14 +332,17 @@ void ClientSocketHandler::fileDataHandler(MessagePackage &pack)
         QStringList senderList=DBHelper::getInstance()->getSenderList(filelist,sender,receiver,group);
         respack.addValue(MessagePackage::key_FileList,filelist);
         respack.addValue(MessagePackage::key_SenderList,senderList);
-        respack.addValue(MessagePackage::Key_Sender, sender); // 发送者
-        respack.addValue(MessagePackage::Key_Receiver, receiver); // 发送对象
-        respack.addValue(MessagePackage::key_FileName, fileName); // 发送的文件名
-        respack.sendMsg(socket); // 发送消息
-        respack.addValue(MessagePackage::Key_Result, 0); // 区分发送者和接受者
-        qDebug() << "send file result to" << sender;
-        if(group) emit updateFileList(receiver);
-        else emit privateFile(respack);
+        respack.addValue(MessagePackage::Key_Sender,sender); // 发送者
+        respack.addValue(MessagePackage::Key_Receiver,receiver); // 发送对象
+        respack.addValue(MessagePackage::key_FileName,fileName); // 发送的文件名
+        respack.addValue(MessagePackage::Key_Result,group); // 区分群组
+        respack.sendMsg(socket); // 发送结果给当前客户端 退出文件线程
+        if(group!=1){//发送结果给私聊双方
+            emit privateFile(respack);
+        }
+        else{
+            emit updateFileList(receiver);//发送结果给群组成员
+        }
 
     }
 }
@@ -390,6 +405,32 @@ void ClientSocketHandler::fileDataRequest(MessagePackage &pack) {
     pack.setType(MessagePackage::Key_Type_FILEDATA);
     pack.sendMsg(socket);
     file.close(); // 关闭文件
+}
+
+void ClientSocketHandler::fileCancelUpload(MessagePackage &pack)
+{
+    // 找到文件存储路径
+    QString sender = pack.getStringValue(MessagePackage::Key_Sender);
+    QString receiver = pack.getStringValue(MessagePackage::Key_Receiver);
+    QString fileName = pack.getStringValue(MessagePackage::key_FileName);
+    qint64 fileSize = pack.getIntValue(MessagePackage::key_FileSize);
+    int sentSize = pack.getIntValue(MessagePackage::Key_SentSize);
+    QString path = "./fileData/";
+    QString filePath;
+    filePath = (pack.getIntValue(MessagePackage::Key_Result) == 1) ? "group" : "private";
+    filePath += sender + receiver + fileName;
+    path += filePath;
+    qDebug() << "文件存储路径：" << path;
+
+    // 打开文件
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "无法打开文件" << path << "错误：" << file.errorString();
+        return;
+    }
+    if (!file.remove()) {
+        qDebug() << "无法删除文件" << fileName<< "错误：" << file.errorString();
+    }
 }
 
 void ClientSocketHandler::onDisConnected()
@@ -516,12 +557,12 @@ void ClientSocketHandler::privateFileHandler(MessagePackage &pack)
     if(group==0){
         QString filePath="private"+sender+receiver+filename;
         path+=filePath;
-        DBHelper::getInstance()->addFile(path,filename,"private",sender,receiver,filesize);
+        // DBHelper::getInstance()->addFile(path,filename,"private",sender,receiver,filesize);
     }
     else{
         QString filePath="group"+sender+receiver+filename;
         path+=filePath;
-        DBHelper::getInstance()->addFile(path,filename,"group",sender,receiver,filesize);
+        // DBHelper::getInstance()->addFile(path,filename,"group",sender,receiver,filesize);
     }
 
     // 打开文件并预先分配磁盘空间

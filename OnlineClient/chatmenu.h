@@ -25,6 +25,11 @@ public:
     ~ChatMenu();
     Ui::ChatMenu *ui;
 public slots:
+    //文件传输速率显示
+    void setFileSpeed(double progressPercentage,double speed,QString fileName,bool send);
+    //文件传输完成显示
+    void setFileFinished(QString fileName,bool send);
+    void setCancelfile(QString filename,bool send);
 signals:
     //发送私聊消息
     void sendPrivateChat(const QString& objName,const QString& msg);
@@ -38,6 +43,10 @@ signals:
     void flushFileList(const QString& objname,bool group);
     //下载文件请求
     void requestFile(const QString& fileName, const QString& senderName,const QString &objName,bool group);
+    //取消当前文件操作
+    void cancelFile();
+    //暂停上传或者下载
+    void pauseFile();
 private slots:
     //点击发送消息
     void on_pb_sendMsg_clicked();
@@ -46,8 +55,13 @@ private slots:
 
     void on_pb_downloadFile_clicked();
 
+    void on_pb_cancle_clicked();
+
+    void on_pb_pausefile_clicked();
+
 private:
     void getLists();//获取列表
+    QString formatSpeed(double speedKBps);
     //聊天对象用户名或群名
     QString objname;
     bool group;//true为群组聊天界面，false为用户聊天界面

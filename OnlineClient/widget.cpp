@@ -71,6 +71,7 @@ void Widget::on_pb_register_clicked()
 void Widget::resultHandler(const MessagePackage &pack)
 {
     //MessagePackage tempPack = pack; // 创建一个非常量的副本
+    qDebug()<<"res type:"<<pack.Type();
     if(pack.Type()==MessagePackage::Key_Type_Login)
     {
         loginResultHandler(pack);
@@ -102,6 +103,7 @@ void Widget::resultHandler(const MessagePackage &pack)
     }
     else if(pack.Type()==MessagePackage::Key_Type_FileOK)//发送文件的结果回复
     {
+        qDebug()<<"sender:"<<pack.getStringValue(MessagePackage::Key_Sender);
         if(pack.getStringValue(MessagePackage::Key_Sender)==usrMenu->getUsername())
         {
             emit sendFileRespond(pack);//发送私聊文件成功

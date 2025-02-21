@@ -14,6 +14,8 @@ ChatMenu::ChatMenu(QWidget *parent,bool group)
     ui->setupUi(this);
     // 自动调整列宽以适应内容
     ui->tableWidget_files->resizeColumnsToContents();
+    ui->tableWidget_files->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    //ui->tableWidget_files->verticalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     this->hide();
     if(!group){
         ui->label_3->hide();
@@ -116,6 +118,44 @@ void ChatMenu::addFileList(const QStringList &filelist, const QStringList &sende
     ui->tableWidget_files->resizeColumnsToContents();
 }
 
+void ChatMenu::setFileSpeed(double progressPercentage,double speed, QString fileName, bool send)
+{
+    QString text;
+    if(send){
+        text="正在上传：";
+    }else{
+        text="正在下载：";
+    }
+    text+=fileName+"\r";
+    text+=formatSpeed(speed)+"\r";
+    text+=QString::number(progressPercentage,'f',2)+"%";
+    ui->label_speed->setText(text);
+}
+
+void ChatMenu::setFileFinished(QString fileName, bool send)
+{
+    QString text;
+    text=fileName+"\r";
+    if(send){
+        text+="上传成功";
+    }else{
+        text+="下载成功";
+    }
+    ui->label_speed->setText(text);
+}
+
+void ChatMenu::setCancelfile(QString filename, bool send)
+{
+    QString text;
+    text=filename+"\r";
+    if(send){
+        text+="上传取消";
+    }else{
+        text+="下载取消";
+    }
+    ui->label_speed->setText(text);
+}
+
 
 void ChatMenu::on_pb_sendFile_clicked() {
     // 打开文件对话框让用户选择文件
@@ -165,5 +205,36 @@ void ChatMenu::getLists()
         emit flushGrroupMembers(objname);
     }
     emit flushFileList(objname,group);
+}
+
+QString ChatMenu::formatSpeed(double speedKBps)
+{
+    if (speedKBps > 1024) {
+        return QString("%1 MB/s").arg(speedKBps / 1024.0, 0, 'f', 1);
+    } else {
+        return QString("%1 KB/s").arg(speedKBps, 0, 'f', 1);
+    }
+}
+
+
+void ChatMenu::on_pb_cancle_clicked()
+{
+    QString text=ui->pb_pausefile->text();
+    if(text=="开始"){
+        ui->pb_pausefile->setText("暂停");
+    }
+    emit cancelFile();
+}
+
+
+void ChatMenu::on_pb_pausefile_clicked()
+{
+    QString text=ui->pb_pausefile->text();
+    if(text=="暂停"){
+        ui->pb_pausefile->setText("开始");
+    }else{
+        ui->pb_pausefile->setText("暂停");
+    }
+    emit pauseFile();
 }
 

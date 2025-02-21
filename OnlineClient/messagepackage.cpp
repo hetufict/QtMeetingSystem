@@ -27,10 +27,10 @@ QString MessagePackage::Key_Type_FilePos="file_position";
 QString MessagePackage::Key_Type_FileOK="file_ok";
 QString MessagePackage::Key_Type_FileDataRequest="file_data_request";
 QString MessagePackage::Key_Type_UpdateLists="update_lists";
+QString MessagePackage::Key_Type_CancelUpload="file_cancel_upload";
+
 QString MessagePackage::Key_OnlineUsers="OnlineUsers";
 QString MessagePackage::Key_OfflineUsers="OfflineUsers";
-
-
 QString MessagePackage::Key_Name="name";
 QString MessagePackage::Key_Pasd="pswd";
 QString MessagePackage::Key_Result="result";

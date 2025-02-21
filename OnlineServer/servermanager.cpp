@@ -161,9 +161,20 @@ void ServerManager::onGroupChat(MessagePackage &pack) {
 
 void ServerManager::onPrivateFile(MessagePackage &pack)
 {
+
+    // QString sender=pack.getFileValue(MessagePackage::Key_Sender);
+    // qDebug()<<sender;
+    // if(users.contains(sender)){
+    //     pack.sendMsg(users[sender]->getSocket());
+    //     qDebug() << "******file sender file to" << sender;
+    // }
     QString recver=pack.getStringValue(MessagePackage::Key_Receiver);
+
+    if(users.contains(recver)){
+        pack.sendMsg(users[recver]->getSocket());
+        qDebug() << "*****file receiver :" << recver;
+    }
     //qDebug() << "send to reading" << recver;
-    pack.sendMsg(users[recver]->getSocket());
     // for(auto handler=clients.begin();handler!=clients.end();handler++)
     // {
     //     if(handler.key()->getLoginUser()==recver)

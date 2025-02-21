@@ -6,12 +6,13 @@
 #include <QByteArray>
 #include <QString>
 #include <QTcpSocket>
-
+#include <QObject>
 
 class MessagePackage
 {
 public:
-    MessagePackage(const char* data=nullptr,int size=0);
+    MessagePackage(const char* data = nullptr, int size = 0);
+    MessagePackage(const MessagePackage&) = default;
     MessagePackage(QByteArray& data);
     QJsonObject m_data;
     QString Type()const;//获取请求类型
@@ -63,8 +64,10 @@ public:
     static QString Key_Type_FileOK;
     static QString Key_Type_FileDataRequest;
     static QString Key_Type_UpdateLists;
+    static QString Key_Type_CancelUpload;
     static QString Key_OnlineUsers;
     static QString Key_OfflineUsers;
+
 
     static QString Key_Name;
     static QString Key_Pasd;
@@ -92,5 +95,6 @@ public:
     static QString Key_MeetingMembersLeave;
     static QString Key_SentSize;
 };
+Q_DECLARE_METATYPE(MessagePackage)
 
 #endif // MESSAGEPACKAGE_H

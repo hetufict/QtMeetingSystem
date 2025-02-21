@@ -304,6 +304,7 @@ QStringList DBHelper::getFileList(const QString &user1, const QString &user2, bo
         }
 
     }
+    qDebug() << "File List Size:" << fileList.size();
     return fileList;
 }
 
@@ -782,7 +783,7 @@ void DBHelper::fileTableInit()
 {
     QSqlQuery query(db);
     QString str = "create table if not exists fileInfo("
-                  "filepath varchar(64) primary key, filename varchar(64) not null,"
+                  "filepath varchar(255) primary key, filename varchar(64) not null,"
                   "sender varchar(64) not null,receiver varchar(64) not null,"
                   "filetype varchar(64) not null,filesize int default 0);";
     if(!query.exec(str))

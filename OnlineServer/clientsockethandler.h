@@ -54,6 +54,7 @@ private:
     void membersListHandler(MessagePackage& pack);
     void fileDataHandler(MessagePackage& pack);
     void fileDataRequest(MessagePackage& pack);
+    void fileCancelUpload(MessagePackage& pack);
     QTcpSocket * socket;
     QString username;
     QHash<QString,MsgHandler> msgHanderMap;

@@ -18,6 +18,8 @@ ChatInfo::ChatInfo(QWidget *parent,QTcpSocket* socket,QString username)
     ui->frame->setLayout(frameLayout);
     //updateUsrListRequest();
     connect(ui->list_UserList,&QListWidget::itemDoubleClicked,this,&ChatInfo::list_UserList_itemDoubleClicked);
+    //恢复文件传输线程
+    recoverFileProcess();
 }
 
 ChatInfo::~ChatInfo()
@@ -173,7 +175,37 @@ void ChatInfo::onReceiveGroupMembers(const MessagePackage &pack)
     }
 }
 
-void ChatInfo::onFileSendFinished() {
+void ChatInfo::onFileSendFinished(MessagePackage& pack) {
+    if(filehelper->getSend()&&!filehelper->getCancel()){
+        QString filename=pack.getStringValue(MessagePackage::key_FileName);
+        QString receiver=pack.getStringValue(MessagePackage::Key_Receiver);//消息发送的对象
+        QStringList filelist=pack.getListValue(MessagePackage::key_FileList);
+        QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
+        QString objGroup=receiver;
+        int group=pack.getIntValue(MessagePackage::Key_Result);
+        qDebug()<<"FileList Size:"<<filelist.size()<<"Sender list Size"<<senderlist.size();
+        auto it = chatList.find(receiver);
+        if(it!=chatList.end())
+        {
+            ChatMenu* chat=it.value();
+            chat->addFileList(filelist,senderlist);
+        }
+        else
+        {
+            // 如果没有找到，创建一个新的 ChatMenu
+            ChatMenu* chat = addNewChatMenu(group);
+            chat->setObjName(objGroup); // 设置聊天对象名称
+            // 将新的 ChatMenu 添加到 chatList 中
+            chatList.insert(objGroup, chat);
+            chat->addFileList(filelist,senderlist);
+        }
+        QMessageBox::information(this,"发送文件","发送文件"+filename+"成功");
+    }
+    if(!filehelper->getCancel()){
+        emit finishedFile(filehelper->getFileName(),filehelper->getSend());
+    }else{
+        emit setCancelFile(filehelper->getFileName(),filehelper->getSend());
+    }
     if (fileThrd) {
         fileThrd->quit(); // 结束线程事件循环
         fileThrd->wait(); // 等待线程结束
@@ -191,6 +223,10 @@ void ChatInfo::onFileSent(const QString &objname, const QString &filePath,bool g
     }
 
     qint64 fileSize = file.size();
+    if(fileSize==0){
+        QMessageBox::warning(this,"打开文件","打开文件的大小为0");
+        return;
+    }
     QString fileName = QFileInfo(filePath).fileName();
     qDebug()<<"file:"<<fileName<<"size:"<<fileSize;
     // 准备协议包
@@ -212,16 +248,8 @@ void ChatInfo::onFileSent(const QString &objname, const QString &filePath,bool g
     file.close();
     // 发送文件数据
     if(filehelper==nullptr&&fileThrd==nullptr){
-        filehelper=new FileHelper(true,group,filePath,fileName,username,objname);
-        fileThrd=new QThread(this);
 
-        // 连接信号和槽，确保文件发送任务在新线程中执行
-        // 在 UserMenu 类中添加槽函数
-        connect(this, &ChatInfo::startFileSendSignal, filehelper, &FileHelper::fileDeal);
-        connect(filehelper, &FileHelper::fileSendFinished, this, &ChatInfo::onFileSendFinished);
-        connect(fileThrd, &QThread::finished, filehelper, &QObject::deleteLater);
-        connect(fileThrd, &QThread::finished, fileThrd, &QObject::deleteLater);
-
+        createFilehelper(true,group,filePath,fileName,username,objname,fileSize);
         filehelper->moveToThread(fileThrd);
         fileThrd->start();
         // 发送信号以启动文件发送任务
@@ -274,6 +302,8 @@ void ChatInfo::onsendFileRespond(const MessagePackage &pack)
     QStringList filelist=pack.getListValue(MessagePackage::key_FileList);
     QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
     QString objGroup=receiver;
+    int group=pack.getIntValue(MessagePackage::Key_Result);
+    qDebug()<<"FileList Size:"<<filelist.size()<<"Sender list Size"<<senderlist.size();
     auto it = chatList.find(receiver);
     if(it!=chatList.end())
     {
@@ -283,7 +313,7 @@ void ChatInfo::onsendFileRespond(const MessagePackage &pack)
     else
     {
         // 如果没有找到，创建一个新的 ChatMenu
-        ChatMenu* chat = addNewChatMenu(true);
+        ChatMenu* chat = addNewChatMenu(group);
         chat->setObjName(objGroup); // 设置聊天对象名称
         // 将新的 ChatMenu 添加到 chatList 中
         chatList.insert(objGroup, chat);
@@ -298,6 +328,7 @@ void ChatInfo::onrecvPrivateFile(const MessagePackage &pack)
     QString receiver=pack.getStringValue(MessagePackage::Key_Sender);//消息发送的对象
     QStringList filelist=pack.getListValue(MessagePackage::key_FileList);
     QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
+    int group=pack.getIntValue(MessagePackage::Key_Result);
     QString objGroup=receiver;
     auto it = chatList.find(receiver);
     if(it!=chatList.end())
@@ -308,7 +339,7 @@ void ChatInfo::onrecvPrivateFile(const MessagePackage &pack)
     else
     {
         // 如果没有找到，创建一个新的 ChatMenu
-        ChatMenu* chat = addNewChatMenu(true);
+        ChatMenu* chat = addNewChatMenu(group);
         chat->setObjName(objGroup); // 设置聊天对象名称
         // 将新的 ChatMenu 添加到 chatList 中
         chatList.insert(objGroup, chat);
@@ -337,6 +368,7 @@ void ChatInfo::onReceiveFileList(const MessagePackage &pack)
     QString receiver=pack.getStringValue(MessagePackage::Key_Name);//消息发送的对象
     QStringList filelist=pack.getListValue(MessagePackage::key_FileList);
     QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
+    int group=pack.getIntValue(MessagePackage::Key_Result);
     QString objGroup=receiver;
     auto it = chatList.find(receiver);
     if(it!=chatList.end())
@@ -347,7 +379,7 @@ void ChatInfo::onReceiveFileList(const MessagePackage &pack)
     else
     {
         // 如果没有找到，创建一个新的 ChatMenu
-        ChatMenu* chat = addNewChatMenu(true);
+        ChatMenu* chat = addNewChatMenu(group);
         chat->setObjName(objGroup); // 设置聊天对象名称
         // 将新的 ChatMenu 添加到 chatList 中
         chatList.insert(objGroup, chat);
@@ -401,16 +433,7 @@ void ChatInfo::onReceiveFile(const MessagePackage &pack)
     // 请求文件数据
     if(filehelper==nullptr&&fileThrd==nullptr){
 
-        //下载，群文件，文件路径，文件名，发送者，接受者
-        filehelper=new FileHelper(false,group,path,filename,fileSender,objname);
-        fileThrd=new QThread(this);
-        filehelper->setFileSize(filesize);
-        // 连接信号和槽，确保文件发送任务在新线程中执行
-        // 在 UserMenu 类中添加槽函数
-        connect(this, &ChatInfo::startFileSendSignal, filehelper, &FileHelper::fileDeal);
-        connect(filehelper, &FileHelper::fileSendFinished, this, &ChatInfo::onFileSendFinished);
-        connect(fileThrd, &QThread::finished, filehelper, &QObject::deleteLater);
-        connect(fileThrd, &QThread::finished, fileThrd, &QObject::deleteLater);
+        createFilehelper(false,group,path,filename,fileSender,objname,filesize);
         filehelper->moveToThread(fileThrd);
         fileThrd->start();
         // 发送信号以启动文件发送任务
@@ -419,6 +442,21 @@ void ChatInfo::onReceiveFile(const MessagePackage &pack)
         QMessageBox::warning(this,"文件下载","请先完成当前文件上传或下载");
     }
 
+}
+
+void ChatInfo::onCancelFile()
+{
+    emit cancelFile();
+}
+
+void ChatInfo::onPauseFile()
+{
+    emit pauseFile();
+}
+
+void ChatInfo::onFileSpeed(double progressPercentage,double speed, QString fileName, bool send)
+{
+    emit updateFileSpeed(progressPercentage,speed,fileName,send);
 }
 
 
@@ -521,5 +559,93 @@ ChatMenu *ChatInfo::addNewChatMenu(bool group)
     connect(chat,&ChatMenu::flushGrroupMembers,this,&ChatInfo::onFlushGroupMembers);
     connect(chat,&ChatMenu::flushFileList,this,&ChatInfo::onFlushFileList);
     connect(chat,&ChatMenu::requestFile,this,&ChatInfo::onRequestFile);
+    connect(chat,&ChatMenu::cancelFile,this,&ChatInfo::onCancelFile);
+    connect(chat,&ChatMenu::pauseFile,this,&ChatInfo::onPauseFile);
+    connect(this,&ChatInfo::updateFileSpeed,chat,&ChatMenu::setFileSpeed);
+    connect(this,&ChatInfo::finishedFile,chat,&ChatMenu::setFileFinished);
+    connect(this,&ChatInfo::setCancelFile,chat,&ChatMenu::setCancelfile);
     return chat;
 }
+
+void ChatInfo::createFilehelper(const bool &send, const bool &group, const QString &filePath,
+                                const QString &filename, const QString &sender, const QString &recer, const qint64 &fileSize)
+{
+    //下载，群文件，文件路径，文件名，发送者，接受者
+    filehelper=new FileHelper(send,group,filePath,filename,sender,recer);
+    fileThrd=new QThread(this);
+    filehelper->setFileSize(fileSize);
+    // 连接信号和槽，确保文件发送任务在新线程中执行
+    // 在 UserMenu 类中添加槽函数
+    connect(this, &ChatInfo::startFileSendSignal, filehelper, &FileHelper::fileDeal);
+    connect(filehelper, &FileHelper::fileSendFinished, this, &ChatInfo::onFileSendFinished);
+    connect(fileThrd, &QThread::finished, filehelper, &QObject::deleteLater);
+    connect(fileThrd, &QThread::finished, fileThrd, &QObject::deleteLater);
+    //文件暂停 取消 进度
+    connect(this,&ChatInfo::cancelFile,filehelper,&FileHelper::onCancelFile);
+    connect(this,&ChatInfo::pauseFile,filehelper,&FileHelper::onPauseFile);
+    connect(filehelper,&FileHelper::transferSpeedUpdated,this,&ChatInfo::onFileSpeed);
+}
+
+void ChatInfo::recoverFileProcess() {
+    QString logFileName = "file_process.txt";
+    QFile log(logFileName);
+
+    // 检查日志文件是否存在
+    if (!log.exists()) {
+        qDebug() << "日志文件不存在，可能是传输已完成或从未开始";
+        return;
+    }
+
+    // 打开日志文件
+    if (!log.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "无法打开日志文件：" << log.errorString();
+        return;
+    }
+
+    // 读取日志文件内容
+    QTextStream in(&log);
+    QString logText = in.readLine(); // 假设日志文件只有一行
+
+    // 解析日志文件内容
+    QStringList logItems = logText.split(';');
+    QMap<QString, QString> logData;
+    for (const QString &item : logItems) {
+        QStringList keyValue = item.split('=');
+        if (keyValue.size() == 2) {
+            logData[keyValue[0]] = keyValue[1];
+        }
+    }
+    // 检索日志数据
+    bool send = logData.value("send").toInt();
+    bool group = logData.value("group").toInt();
+    QString filePath = logData.value("filePath");
+    QString fileName = logData.value("fileName");
+    QString sender = logData.value("sender");
+    QString receiver = logData.value("receiver");
+    qint64 sentSize = logData.value("sentSize").toLongLong();
+    qint64 fileSize = logData.value("fileSize").toLongLong();
+    double progress = logData.value("progress").toDouble();
+
+    // 输出恢复的信息
+    qDebug() << "恢复传输信息：" << "发送状态：" << send << "是否群组：" << group
+             << "文件路径：" << filePath << "文件名：" << fileName << "发送者：" << sender
+             << "接收者：" << receiver << "已发送字节数：" << sentSize << "文件总大小："
+             << fileSize << "进度百分比：" << progress;
+    if(filehelper==nullptr&&fileThrd==nullptr){
+        createFilehelper(send,group,filePath,fileName,sender,receiver,fileSize);
+        filehelper->setSentSize(sentSize);
+        filehelper->setPause(true);
+
+        filehelper->moveToThread(fileThrd);
+        fileThrd->start();
+        // 发送信号以启动文件发送任务
+        emit startFileSendSignal();
+    }else{
+        return ;
+    }
+}
+
+
+
+
+
