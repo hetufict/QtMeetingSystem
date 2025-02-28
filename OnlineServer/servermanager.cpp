@@ -1,6 +1,7 @@
+#include <QDebug>
 #include "ServerManager.h"
 #include "ClientSocketHandler.h"
-#include <QDebug>
+#include "logger.h"
 // 初始化静态成员变量
 ServerManager* ServerManager::instance = nullptr;
 
@@ -37,6 +38,7 @@ void ServerManager::onUpdateLists() {
         // 发送消息包到客户端
         pack.sendMsg(handler->getSocket());
     }
+    LOG(Logger::Info,"pack:Key_Type_UpdateLists");
 }
 
 void ServerManager::onUpdateGroupMemberList(const QString& groupName)
@@ -52,6 +54,7 @@ void ServerManager::onUpdateGroupMemberList(const QString& groupName)
             pack.sendMsg(users[it]->getSocket());
         }
     }
+    LOG(Logger::Info,"Key_Type_GetGroupMembers");
 }
 
 void ServerManager::onUpdateFileList(const QString &groupName)
@@ -60,7 +63,6 @@ void ServerManager::onUpdateFileList(const QString &groupName)
     QStringList groupMembers=DBHelper::getInstance()->getGroupMembers(groupName);
     QStringList filelist=DBHelper::getInstance()->getFileList(groupName);
     QStringList senderlist=DBHelper::getInstance()->getSenderList(filelist,"",groupName,true);
-    qDebug()<<"filelist size:"<<filelist.size()<<" sendlerlist size:"<<senderlist.size();
     //遍历群员列表，发送群组成员信息
     for(const auto& it:groupMembers){
         MessagePackage pack;
@@ -72,6 +74,7 @@ void ServerManager::onUpdateFileList(const QString &groupName)
             pack.sendMsg(users[it]->getSocket());
         }
     }
+    LOG(Logger::Info,"pack: Key_Type_GetFileList");
 }
 void ServerManager::onNewConnection()
 {
@@ -82,9 +85,11 @@ void ServerManager::onNewConnection()
     clients[handler]="";
     // 检查套接字是否连接
     if (socket->state() == QAbstractSocket::ConnectedState) {
-        qDebug() << "Client connected:" << socket->peerAddress().toString()<<" "<<socket->peerPort();
+        LOG(Logger::Info,QString("client connected: %1 %2").arg( socket->peerAddress().toString()).arg(socket->peerPort()));
     } else {
         qDebug() << "Client not connected yet.";
+        LOG(Logger::Warning,"Client not conneted");
+
     }
     connect(handler,&ClientSocketHandler::setClientName,this,&ServerManager::recvClientName);
     connect(handler,&ClientSocketHandler::clientOffline,this,&ServerManager::onClientOffline);
@@ -102,7 +107,6 @@ void ServerManager::recvClientName(ClientSocketHandler* handler,const QString& n
 {
     clients[handler]=name;
     users[name]=handler;
-    //qDebug()<<"set handler name :"<<clients[handler];
 }
 
 void ServerManager::onClientOffline(ClientSocketHandler *handler)
@@ -127,23 +131,21 @@ void ServerManager::onClientOffline(ClientSocketHandler *handler)
 void ServerManager::onPrivateChat(MessagePackage &pack)
 {
     QString recver=pack.getStringValue(MessagePackage::Key_Receiver);
-    //qDebug() << "send to reading" << recver;
     for(auto handler=clients.begin();handler!=clients.end();handler++)
     {
         if(handler.key()->getLoginUser()==recver)
         {
-            //qDebug() << "send to" << recver;
             pack.sendMsg(handler.key()->getSocket());
             break;
         }
     }
+    LOG(Logger::Info,"pack: private msg");
 }
 
 void ServerManager::onGroupChat(MessagePackage &pack) {
     QString groupName = pack.getStringValue(MessagePackage::Key_Receiver);
     QString sender = pack.getStringValue(MessagePackage::Key_Sender);
     QStringList members = DBHelper::getInstance()->getGroupMembers(groupName);
-    //qDebug() << "send to" <<groupName<<"members";
     // 遍历所有群成员
     for (const QString &memberName : members) {
         if (memberName == sender) {
@@ -153,61 +155,41 @@ void ServerManager::onGroupChat(MessagePackage &pack) {
         for(auto handler=clients.begin();handler!=clients.end();handler++){
             if (handler.key()->getLoginUser()== memberName) {
                 pack.sendMsg(handler.key()->getSocket());
-                //qDebug() << "send to" <<groupName<<"members:"<<memberName;
             }
         }
     }
+    LOG(Logger::Info,"pack: group msg");
 }
 
 void ServerManager::onPrivateFile(MessagePackage &pack)
 {
 
-    // QString sender=pack.getFileValue(MessagePackage::Key_Sender);
-    // qDebug()<<sender;
-    // if(users.contains(sender)){
-    //     pack.sendMsg(users[sender]->getSocket());
-    //     qDebug() << "******file sender file to" << sender;
-    // }
     QString recver=pack.getStringValue(MessagePackage::Key_Receiver);
 
     if(users.contains(recver)){
         pack.sendMsg(users[recver]->getSocket());
-        qDebug() << "*****file receiver :" << recver;
+        LOG(Logger::Info,"pack: group file information");
     }
-    //qDebug() << "send to reading" << recver;
-    // for(auto handler=clients.begin();handler!=clients.end();handler++)
-    // {
-    //     if(handler.key()->getLoginUser()==recver)
-    //     {
-    //         qDebug() << "send fileinfo to" << recver;
-    //         pack.sendMsg(handler.key()->getSocket());
-    //         break;
-    //     }
-    // }
 }
 
 void ServerManager::onInviteMeeting(MessagePackage &pack)
 {
     QString recver=pack.getStringValue(MessagePackage::Key_Receiver);
-    //qDebug() << "send to reading" << recver;
     for(auto handler=clients.begin();handler!=clients.end();handler++)
     {
         if(handler.key()->getLoginUser()==recver)
         {
-            //qDebug() << "send to" << recver;
             pack.sendMsg(handler.key()->getSocket());
             break;
         }
     }
+    LOG(Logger::Info,"pack: meeting invitarion");
 }
 
 void ServerManager::onCleanMeeting(MessagePackage &pack)
 {
-    //QString groupName = pack.getStringValue(MessagePackage::Key_Receiver);
-    //QString sender = pack.getStringValue(MessagePackage::Key_Sender);
     QString hostname=pack.getStringValue(MessagePackage::Key_Name);
     QStringList members = pack.getListValue(MessagePackage::Key_UserList);
-    //qDebug() << "send to" <<groupName<<"members";
     // 遍历所有群成员
     for (const QString &memberName : members) {
         if (memberName == hostname) {
@@ -217,10 +199,10 @@ void ServerManager::onCleanMeeting(MessagePackage &pack)
         for(auto handler=clients.begin();handler!=clients.end();handler++){
             if (handler.key()->getLoginUser()== memberName) {
                 pack.sendMsg(handler.key()->getSocket());
-                //qDebug() << "send to" <<groupName<<"members:"<<memberName;
             }
         }
     }
+    LOG(Logger::Info,"pack: meeting room closed");
 }
 
 // 构造函数
@@ -232,9 +214,10 @@ ServerManager::ServerManager(QObject *parent) : QObject(parent), listenIP(QHostA
     //server->listen(listenIP, listenPort);
     if (!server->listen(listenIP, listenPort)) {
         // 处理监听失败的情况
-        qDebug() << "Server failed to start!";
+        LOG(Logger::Error,"Server failed to start!");
     } else {
         qDebug() << "Server started on port" << listenPort;
+        LOG(Logger::Info,QString("Server started on port: %1").arg(listenPort));
     }
 }
 
@@ -259,4 +242,5 @@ ServerManager::~ServerManager() {
         it = clients.erase(it); // 使用 erase 返回的迭代器
     }
     server->close();
+    LOG(Logger::Info,"Server closed");
 }

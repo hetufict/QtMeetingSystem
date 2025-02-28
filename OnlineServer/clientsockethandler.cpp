@@ -1,7 +1,9 @@
-#include "clientsockethandler.h"
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
+#include "clientsockethandler.h"
+#include "logger.h"
+
 ClientSocketHandler::ClientSocketHandler(QTcpSocket *socket, QObject *parent) :
     QObject(parent),socket(socket),username("")
 {
@@ -97,7 +99,6 @@ void ClientSocketHandler::getFileListHandler(MessagePackage &pack)
 {
     QString sender=pack.getStringValue(MessagePackage::Key_Sender);
     QString objname=pack.getStringValue(MessagePackage::Key_Name);
-    qDebug()<<"??"<<objname;
     int group=pack.getIntValue(MessagePackage::Key_Result);
     QStringList filelist=DBHelper::getInstance()->getFileList(sender,objname,group);
     QStringList senderList=DBHelper::getInstance()->getSenderList(filelist,sender,objname,group);
@@ -129,27 +130,22 @@ void ClientSocketHandler::getFileHandler(MessagePackage &pack)
     }
     path+=fileName;
     QFile file(path);
-    qDebug()<<"sender"<<packSender<<"objname:"<<objname<<"fileSender:"<<fileSender;
-    qDebug()<<"filePath::"<<path;
     if (!file.open(QIODevice::ReadOnly)) {
-        qDebug() << "无法打开文件:" << file.fileName();
+        LOG(Logger::Warning,QString("open file :%1 failed").arg(fileName));
         return;
     }
     qint64 fileSize = file.size();
-    QString rfileName = QFileInfo(fileName).fileName();
-    qDebug()<<"file:"<<rfileName<<"size:"<<fileSize;
     // 准备协议包
     pack.addValue(MessagePackage::key_FileSize, fileSize); // 发送的文件大小
     // 发送协议包
     pack.sendMsg(socket);
     file.close();
-    qDebug()<<"文件关闭："<<rfileName;
 }
 
 void ClientSocketHandler::createMeetingHandler(MessagePackage &pack)
 {
-    QString meetingName=pack.getStringValue(MessagePackage::key_MeetingName);
-    QString hostname=pack.getStringValue(MessagePackage::Key_Name);
+    QString meetingName=pack.getStringValue(MessagePackage::key_MeetingName); //会议名
+    QString hostname=pack.getStringValue(MessagePackage::Key_Name);//主持人
     int i=0;
     for(;i<3000;++i)
     {
@@ -163,7 +159,7 @@ void ClientSocketHandler::createMeetingHandler(MessagePackage &pack)
         return;
     }
     int port1=1000+i,port2=1001+i,port3=1002+i;
-    bool joined=false;
+    //分配upd端口
     int ret=DBHelper::getInstance()->addMeeting(meetingName,hostname,port1,port2,port3);
     if(ret!=-1){
         DBHelper::getInstance()->ports[i]=true;
@@ -185,7 +181,6 @@ void ClientSocketHandler::inviteMeetingHandler(MessagePackage &pack)
     QString meetingName=pack.getStringValue(MessagePackage::key_MeetingName);
     int meetingID=pack.getIntValue(MessagePackage::key_MeetingID);
     bool ret=DBHelper::getInstance()->userIsOnline(name);//检查用户是否在线
-    qDebug()<<"online:"<<ret;
     if(ret)
     {
         //检查用户是否有记录
@@ -205,13 +200,10 @@ void ClientSocketHandler::joinMeetingHandler(MessagePackage &pack)
     QString name=pack.getStringValue(MessagePackage::Key_Sender);
     QString meetingName=pack.getStringValue(MessagePackage::key_MeetingName);
     int meetingID=pack.getIntValue(MessagePackage::key_MeetingID);
-    qDebug()<<"meetingName:"<<meetingName<<"meetingID:"<<meetingID;
     //检查用户在不在会议中
     bool ret=DBHelper::getInstance()->isMemberJoined(meetingID,meetingName,name);
-    //qDebug()<<"name"<<name<<"joined:"<<ret;
     if(ret){
         ret=DBHelper::getInstance()->joinMeeting(meetingID,meetingName,name);
-        //qDebug()<<"name"<<name<<"join:"<<ret;
         int* ports=DBHelper::getInstance()->getMeetingPorts(meetingID,meetingName);
         if(ports!=nullptr){
             pack.addValue(MessagePackage::Key_MessagePort,ports[0]);
@@ -249,21 +241,19 @@ void ClientSocketHandler::closeMeetingHandler(MessagePackage &pack)
         pack.addValue(MessagePackage::Key_Result,ret);
         emit cleanMeeting(pack);
     }else{//非主持人用户离开会议
-        qDebug()<<"meeting ID:"<<meetingID<<"meetingName:"<<meetingName<<"member:"<<user;
         int leave=DBHelper::getInstance()->leaveMeeting(meetingID,meetingName,user);//离开会议(改变表中参会状态)
         pack.addValue(MessagePackage::Key_CloseMeeting,leave);
-        //qDebug()<<leave<<"1111";
     }
     pack.sendMsg(socket);
 }
 
 void ClientSocketHandler::membersListHandler(MessagePackage &pack)
 {
-    int meetingID=pack.getIntValue(MessagePackage::key_MeetingID);
-    QString meetingName=pack.getStringValue(MessagePackage::key_MeetingName);
-    QStringList membersIn=DBHelper::getInstance()->getInMembers(meetingID,meetingName);
-    QStringList membersAbsent=DBHelper::getInstance()->getAbsentMembers(meetingID,meetingName);
-    QStringList membersLeft=DBHelper::getInstance()->getLeaveMembers(meetingID,meetingName);
+    int meetingID=pack.getIntValue(MessagePackage::key_MeetingID);//ID
+    QString meetingName=pack.getStringValue(MessagePackage::key_MeetingName);//会议主题
+    QStringList membersIn=DBHelper::getInstance()->getInMembers(meetingID,meetingName);//到场人员
+    QStringList membersAbsent=DBHelper::getInstance()->getAbsentMembers(meetingID,meetingName);//缺席人员
+    QStringList membersLeft=DBHelper::getInstance()->getLeaveMembers(meetingID,meetingName);//退场人员
     pack.addValue(MessagePackage::Key_MeetingMembersIn,membersIn);
     pack.addValue(MessagePackage::Key_MeetingMembersAbsent,membersAbsent);
     pack.addValue(MessagePackage::Key_MeetingMembersLeave,membersLeft);
@@ -274,7 +264,6 @@ const size_t WRITE_THRESHOLD=1024*1024;
 
 void ClientSocketHandler::fileDataHandler(MessagePackage &pack)
 {
-    qDebug()<<"read file size:"<<pack.getIntValue(MessagePackage::Key_SentSize);
     //设置文件存储路径
     QString path="./fileData/";
     QString filePath;
@@ -293,14 +282,12 @@ void ClientSocketHandler::fileDataHandler(MessagePackage &pack)
     int sentSize=pack.getIntValue(MessagePackage::Key_SentSize);
     filePath+=sender+receiver+fileName;
     path+=filePath;
-    qDebug() << "文件存储路径：" << path;
     // 写入数据
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Append)) {
-        qDebug() << "无法打开文件" << path << "错误：" << file.errorString();
+        LOG(Logger::Warning,QString("open file :%1 failed: %2").arg(path).arg(file.errorString()));
         return;
     }
-    //qDebug()<<"buffer contain:\n"<<fileData.toStdString();
     file.seek(sentSize-fileData.size()); // 定位到文件的上次写入的位置
     file.write(fileData);   // 写入数据
     file.close();           // 关闭文件
@@ -365,40 +352,37 @@ void ClientSocketHandler::fileDataRequest(MessagePackage &pack) {
     // 打开文件
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        qDebug() << "无法打开文件" << path << "错误：" << file.errorString();
+        LOG(Logger::Warning,QString("open file :%1 failed: %2").arg(path).arg(file.errorString()));
         return;
     }
     // 检查文件大小
     qint64 fileSizeActual = file.size();
     if (fileSizeActual < fileSize) {
-        qDebug() << "文件大小不匹配，文件大小：" << fileSizeActual << "，期望大小：" << fileSize;
+        LOG(Logger::Warning,QString("filesize error: respect:%1 actual:%2").arg(fileSize).arg(fileSizeActual));
         file.close();
         return;
     }
     // 检查套接字状态
     if (socket->state() != QAbstractSocket::ConnectedState) {
-        qDebug() << "Socket error:" << socket->error();
-        qDebug() << "Socket error string:" << socket->errorString();
+        LOG(Logger::Error,QString("Socket error: %1.Socket error string:%2").arg(socket->error()).arg(socket->errorString()));
         file.close();
         return;
     }
     // 定位到当前文件指针位置
-    if (!file.seek(sentSize)) {
-        qDebug() << "无法定位到文件位置" << sentSize << "错误：" << file.errorString();
+    if (!file.seek(sentSize)){
+        QString("file seek error pos: %1. Error string: %2").arg(sentSize).arg(file.errorString());
         file.close();
         return;
     }
+
     // 读取分块数据
     const int bufferSize = 8192;
     int currentSize = std::min(bufferSize, (int)(fileSize - sentSize));
-    qDebug()<<"currentSize:"<<currentSize<<" sentSize:"<<sentSize<<"Filesize:"<<fileSize;
     QByteArray buffer = file.read(currentSize);
     if (buffer.isEmpty()) {
-        qDebug() << "文件读取失败：" << file.errorString();
+        LOG(Logger::Warning,QString("open file failed: %1").arg(file.errorString()));
         file.close();
-        // return;
     }
-    //qDebug()<<"currentSize:"<<currentSize;
     // 文件数据添加进数据包，回发结果客户端
     pack.addValue(MessagePackage::Key_SentSize, sentSize + currentSize);
     pack.addValue(MessagePackage::key_FileData, buffer);
@@ -420,16 +404,15 @@ void ClientSocketHandler::fileCancelUpload(MessagePackage &pack)
     filePath = (pack.getIntValue(MessagePackage::Key_Result) == 1) ? "group" : "private";
     filePath += sender + receiver + fileName;
     path += filePath;
-    qDebug() << "文件存储路径：" << path;
 
     // 打开文件
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        qDebug() << "无法打开文件" << path << "错误：" << file.errorString();
+        LOG(Logger::Warning,QString("open file :%1 failed: %2").arg(path).arg(file.errorString()));
         return;
     }
     if (!file.remove()) {
-        qDebug() << "无法删除文件" << fileName<< "错误：" << file.errorString();
+        LOG(Logger::Warning,QString("remove file :%1 failed: %2").arg(path).arg(file.errorString()));
     }
 }
 
@@ -441,9 +424,10 @@ void ClientSocketHandler::onDisConnected()
 void ClientSocketHandler::handler(const MessagePackage &pack)
 {
     MessagePackage tempPack = pack; // 创建一个非常量的副本
-    qDebug()<<"handler going"<<tempPack.Type()<<" "<<socket->peerPort();
     auto msgHandler=getHandler(tempPack.Type());
     msgHandler(tempPack);
+    LOG(Logger::Info,pack.Type());
+
 }
 
 MsgHandler ClientSocketHandler::getHandler(QString msgType)
@@ -452,6 +436,7 @@ MsgHandler ClientSocketHandler::getHandler(QString msgType)
     if(it==msgHanderMap.end()){
         return [=](MessagePackage pack){
             qDebug()<<"not find handler: msgType";
+            LOG(Logger::Error,"can not find pack type");
         };
     }else{
         return msgHanderMap[msgType];
@@ -466,7 +451,6 @@ void ClientSocketHandler::loginHandler(MessagePackage &pack)
     //数据库访问
     int ret=DBHelper::getInstance()->userLogin(name,pswd);
     pack.addValue("result",ret);
-    //qDebug()<<"name:"<<name<<" pswd:"<<pswd<<"result:"<<pack.getIntValue("result");
     //发送给客户端
     pack.sendMsg(socket);
     if(pack.getIntValue("result")==1)
@@ -496,7 +480,6 @@ void ClientSocketHandler::registerHandler(MessagePackage &pack)
 
 void ClientSocketHandler::updateUserListHandler(MessagePackage &pack)
 {
-    //qDebug()<<"name:"<<pack.getStringValue("name")<<" type:"<<pack.Type();
     QStringList list=DBHelper::getInstance()->getUsers();
     QStringList listg=DBHelper::getInstance()->getGroupNames(pack.getStringValue(MessagePackage::Key_Name));
     pack.addValue(MessagePackage::Key_UserList,list);
@@ -506,7 +489,6 @@ void ClientSocketHandler::updateUserListHandler(MessagePackage &pack)
 
 void ClientSocketHandler::privateChatHandler(MessagePackage &pack)
 {
-    //qDebug()<<"send from"<<pack.getStringValue(MessagePackage::Key_Sender);
     emit privateMsg(pack);
 }
 
@@ -545,7 +527,6 @@ void ClientSocketHandler::getGroupMembersHandler(MessagePackage &pack)
 
 void ClientSocketHandler::privateFileHandler(MessagePackage &pack)
 {
-    //qDebug() << "get a file pack";
     //获取协议包信息
     QString sender=pack.getStringValue(MessagePackage::Key_Sender);//发送者
     QString receiver=pack.getStringValue(MessagePackage::Key_Receiver);//接受者
@@ -568,19 +549,18 @@ void ClientSocketHandler::privateFileHandler(MessagePackage &pack)
     // 打开文件并预先分配磁盘空间
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly)) {
-        qDebug() << "无法打开文件" << path << "错误：" << file.errorString();
+        LOG(Logger::Warning,QString("open file :%1 failed: %2").arg(path).arg(file.errorString()));
         return;
     }
 
     // 预先分配文件大小
     if (!file.resize(filesize)) {
-        qDebug() << "无法分配文件大小" << filesize << "字节，错误：" << file.errorString();
+        LOG(Logger::Warning, QString("file seek error pos:%1. Error string: %2")
+                .arg(filesize)
+                .arg(file.errorString()));
         file.close();
         return;
     }
-
-    qDebug() << "文件" << path << "已成功分配" << filesize << "字节的磁盘空间";
-
     // 关闭文件
     file.close();
 }

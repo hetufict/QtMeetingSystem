@@ -1,6 +1,8 @@
+#include <QDir>
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
-#include <QDir>
+#include "logger.h"
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -22,3 +24,4 @@ MainWindow::~MainWindow()
     ServerManager::removeInstance();
     delete ui;
 }
+

@@ -30,6 +30,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         messagepackage.h messagepackage.cpp
 
         dbhelper.h dbhelper.cpp
+        logger.h logger.cpp
 
 
 
