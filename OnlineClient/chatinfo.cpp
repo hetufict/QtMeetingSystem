@@ -1,10 +1,11 @@
-#include <QMessageBox>
-#include "chatinfo.h"
-#include "ui_chatinfo.h"
 #include <QFile>
 #include <QFileInfo>
 #include <QDialog>
 #include <QInputDialog>
+#include <QMessageBox>
+#include "chatinfo.h"
+#include "ui_chatinfo.h"
+#include "logger.h"
 ChatInfo::ChatInfo(QWidget *parent,QTcpSocket* socket,QString username)
     : QWidget(parent)
     , ui(new Ui::ChatInfo)
@@ -60,7 +61,6 @@ void ChatInfo::updateUserList(const MessagePackage &pack)
 void ChatInfo::onReceivePrivateChat(const MessagePackage &pack)
 {
     QString sender=pack.getStringValue(MessagePackage::Key_Sender);
-    //QString reciver=pack.getStringValue(MessagePackage::Key_Receiver);//自己就是接收者
     QString msg=pack.getStringValue(MessagePackage::Key_Message);
     auto it = chatList.find(sender);
     if(it!=chatList.end())
@@ -77,6 +77,7 @@ void ChatInfo::onReceivePrivateChat(const MessagePackage &pack)
         chatList.insert(sender, chat);
         chat->addMsgText(msg);
     }
+    LOG(Logger::Info,"receive parivate message");
 }
 
 void ChatInfo::getPrivateMsg(const QString &objName, const QString &msg)
@@ -86,8 +87,8 @@ void ChatInfo::getPrivateMsg(const QString &objName, const QString &msg)
     pack.addValue(MessagePackage::Key_Sender,username);//发送者
     pack.addValue(MessagePackage::Key_Receiver,objName);//发送对象
     pack.addValue(MessagePackage::Key_Message,msg);//内容
-    //qDebug()<<"send to"<<objName;
     pack.sendMsg(socket);
+    LOG(Logger::Info,"send parivate message to "+objName);
 }
 
 void ChatInfo::onAddaddGroupRet(const MessagePackage &pack)
@@ -97,10 +98,12 @@ void ChatInfo::onAddaddGroupRet(const MessagePackage &pack)
     if(ret)
     {
         QMessageBox::information(this,"新建群聊","新建群聊"+groupName+"成功");
+            LOG(Logger::Info,"created a group "+groupName);
     }
     else
     {
         QMessageBox::warning(this,"新建群聊","新建群聊"+groupName+"失败");
+            LOG(Logger::Info,"failed to create a group "+groupName);
     }
 }
 
@@ -111,6 +114,7 @@ void ChatInfo::onFlushGroupMembers(const QString &objname)
     pack.addValue(MessagePackage::Key_Sender,username);//发送者
     pack.addValue(MessagePackage::Key_GroupName,objname);//发送对象
     pack.sendMsg(socket);
+    LOG(Logger::Info,"request group memberlist");
 }
 
 void ChatInfo::getGroupMsg(const QString &objName, const QString &msg)
@@ -121,9 +125,8 @@ void ChatInfo::getGroupMsg(const QString &objName, const QString &msg)
     pack.addValue(MessagePackage::Key_Sender, username); // 发送者
     pack.addValue(MessagePackage::Key_Receiver, objGroup); // 发送对象
     pack.addValue(MessagePackage::Key_Message, msg); // 内容
-
-    qDebug() << "send to" << objGroup; // 调试输出，确认发送对象
     pack.sendMsg(socket); // 发送消息
+    LOG(Logger::Info, QString("send a group message group: %1").arg(objGroup));
 }
 
 void ChatInfo::onReceiveGroupChat(const MessagePackage &pack)
@@ -131,9 +134,7 @@ void ChatInfo::onReceiveGroupChat(const MessagePackage &pack)
     QString sender=pack.getStringValue(MessagePackage::Key_Sender);//消息发送者
     QString receiver=pack.getStringValue(MessagePackage::Key_Receiver);//消息发送的群聊
     QString msg=pack.getStringValue(MessagePackage::Key_Message);
-    qDebug()<<"group chat:"<<receiver;
     msg=sender+"says:"+msg;
-    //QString objGroup="group"+receiver;
     QString objGroup=receiver;
     auto it = chatList.find(objGroup);
     if(it!=chatList.end())
@@ -150,6 +151,7 @@ void ChatInfo::onReceiveGroupChat(const MessagePackage &pack)
         chatList.insert(objGroup, chat);
         chat->addMsgText(msg);
     }
+    LOG(Logger::Info, QString("receive a group message group: %1").arg(objGroup));
 }
 
 void ChatInfo::onReceiveGroupMembers(const MessagePackage &pack)
@@ -157,7 +159,6 @@ void ChatInfo::onReceiveGroupMembers(const MessagePackage &pack)
     QString receiver=pack.getStringValue(MessagePackage::Key_GroupName);//消息发送的群聊
     QStringList groupMembers=pack.getListValue(MessagePackage::Key_UserList);
     QString objGroup=receiver;
-    qDebug()<<"get group members:"<<receiver;
     auto it = chatList.find(objGroup);
     if(it!=chatList.end())
     {
@@ -173,17 +174,17 @@ void ChatInfo::onReceiveGroupMembers(const MessagePackage &pack)
         chatList.insert(objGroup, chat);
         chat->addGroupMembers(groupMembers);
     }
+    LOG(Logger::Info, QString("receive a group member list group: %1").arg(objGroup));
 }
-
+//文件线程结束
 void ChatInfo::onFileSendFinished(MessagePackage& pack) {
-    if(filehelper->getSend()&&!filehelper->getCancel()){
-        QString filename=pack.getStringValue(MessagePackage::key_FileName);
+    if(filehelper->getSend()&&!filehelper->getCancel()){//文件上传成功
+        QString filename=pack.getStringValue(MessagePackage::key_FileName);//文件名
         QString receiver=pack.getStringValue(MessagePackage::Key_Receiver);//消息发送的对象
-        QStringList filelist=pack.getListValue(MessagePackage::key_FileList);
-        QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
+        QStringList filelist=pack.getListValue(MessagePackage::key_FileList);//更新文件列表
+        QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);//文件发送者列表
         QString objGroup=receiver;
         int group=pack.getIntValue(MessagePackage::Key_Result);
-        qDebug()<<"FileList Size:"<<filelist.size()<<"Sender list Size"<<senderlist.size();
         auto it = chatList.find(receiver);
         if(it!=chatList.end())
         {
@@ -200,11 +201,14 @@ void ChatInfo::onFileSendFinished(MessagePackage& pack) {
             chat->addFileList(filelist,senderlist);
         }
         QMessageBox::information(this,"发送文件","发送文件"+filename+"成功");
+        LOG(Logger::Info,"send file:"+filename+" succeed");
     }
     if(!filehelper->getCancel()){
         emit finishedFile(filehelper->getFileName(),filehelper->getSend());
-    }else{
+
+    }else{//取消当前文件操作
         emit setCancelFile(filehelper->getFileName(),filehelper->getSend());
+        LOG(Logger::Info,"file:"+filehelper->getFileName()+" cancel");
     }
     if (fileThrd) {
         fileThrd->quit(); // 结束线程事件循环
@@ -219,16 +223,17 @@ void ChatInfo::onFileSent(const QString &objname, const QString &filePath,bool g
     if (!file.open(QIODevice::ReadOnly)) {
         qDebug() << "无法打开文件:" << filePath;
         QMessageBox::warning(this,"打开文件","打开文件失败");
+        LOG(Logger::Error,"open file errror: "+filePath);
         return;
     }
 
     qint64 fileSize = file.size();
     if(fileSize==0){
         QMessageBox::warning(this,"打开文件","打开文件的大小为0");
+        LOG(Logger::Warning,"open file error:size = 0"+filePath);
         return;
     }
     QString fileName = QFileInfo(filePath).fileName();
-    qDebug()<<"file:"<<fileName<<"size:"<<fileSize;
     // 准备协议包
     MessagePackage pack;
     pack.setType(MessagePackage::Key_Type_PrivateFile); // 设置发送包类型
@@ -256,6 +261,7 @@ void ChatInfo::onFileSent(const QString &objname, const QString &filePath,bool g
         emit startFileSendSignal();
     }else{
         QMessageBox::warning(this,"文件上传","请先完成当前文件上传或下载");
+        LOG(Logger::Warning,"send file :file thread is alive");
     }
 }
 
@@ -293,6 +299,7 @@ void ChatInfo::onUpdateLists(const MessagePackage &pack) {
         item->setTextAlignment(Qt::AlignCenter); // 设置文本居中
         ui->list_groupList->addItem(item);
     }
+    LOG(Logger::Info,"flush userlist and grouplist");
 }
 
 void ChatInfo::onsendFileRespond(const MessagePackage &pack)
@@ -303,7 +310,6 @@ void ChatInfo::onsendFileRespond(const MessagePackage &pack)
     QStringList senderlist=pack.getListValue(MessagePackage::key_SenderList);
     QString objGroup=receiver;
     int group=pack.getIntValue(MessagePackage::Key_Result);
-    qDebug()<<"FileList Size:"<<filelist.size()<<"Sender list Size"<<senderlist.size();
     auto it = chatList.find(receiver);
     if(it!=chatList.end())
     {
@@ -319,7 +325,7 @@ void ChatInfo::onsendFileRespond(const MessagePackage &pack)
         chatList.insert(objGroup, chat);
         chat->addFileList(filelist,senderlist);
     }
-    QMessageBox::information(this,"发送文件","发送文件"+filename+"成功");
+    // QMessageBox::information(this,"发送文件","发送文件"+filename+"成功");
 }
 
 void ChatInfo::onrecvPrivateFile(const MessagePackage &pack)
@@ -361,6 +367,7 @@ void ChatInfo::onFlushFileList(const QString &objname,bool group)
         pack.addValue(MessagePackage::Key_Result, 0);
     }
     pack.sendMsg(socket);
+    LOG(Logger::Info,"request flush filelist");
 }
 
 void ChatInfo::onReceiveFileList(const MessagePackage &pack)
@@ -385,6 +392,7 @@ void ChatInfo::onReceiveFileList(const MessagePackage &pack)
         chatList.insert(objGroup, chat);
         chat->addFileList(filelist,senderlist);
     }
+    LOG(Logger::Info,"receive a file list");
 }
 
 void ChatInfo::onRequestFile(const QString &filename, const QString &senderName, const QString &objName,bool group)
@@ -401,8 +409,8 @@ void ChatInfo::onRequestFile(const QString &filename, const QString &senderName,
     }else{
         pack.addValue(MessagePackage::Key_Result, 0);
     }
-    //qDebug()<<group;
     pack.sendMsg(socket);
+    LOG(Logger::Info,"request a file");
 }
 
 //提示文件是否可以下载，预开辟文件空间，开辟线程，请求文件数据
@@ -419,13 +427,13 @@ void ChatInfo::onReceiveFile(const MessagePackage &pack)
     // 打开文件并预先分配磁盘空间
     QFile file(filePos);
     if (!file.open(QIODevice::WriteOnly)) {
-        qDebug() << "无法打开文件" << filePos << "错误：" << file.errorString();
+        LOG(Logger::Error,"open file failed "+filePos+file.errorString());
         return;
     }
 
     // 预先分配文件大小
     if (!file.resize(filesize)) {
-        qDebug() << "无法分配文件大小" << filesize << "字节，错误：" << file.errorString();
+        LOG(Logger::Error,"resize file failed "+filePos+file.errorString());
         file.close();
         return;
     }
@@ -440,6 +448,7 @@ void ChatInfo::onReceiveFile(const MessagePackage &pack)
         emit startFileSendSignal();
     }else{
         QMessageBox::warning(this,"文件下载","请先完成当前文件上传或下载");
+        LOG(Logger::Warning,"requst a file :file thread is alive");
     }
 
 }
@@ -507,6 +516,7 @@ void ChatInfo::on_pb_newgroup_clicked()
         pack.addValue(MessagePackage::Key_Name,username);
         pack.addValue(MessagePackage::Key_GroupName,groupName);
         pack.sendMsg(socket);
+        LOG(Logger::Info,"add new group requst group: "+groupName);
     }
     else
     {
@@ -592,13 +602,15 @@ void ChatInfo::recoverFileProcess() {
 
     // 检查日志文件是否存在
     if (!log.exists()) {
-        qDebug() << "日志文件不存在，可能是传输已完成或从未开始";
+        LOG(Logger::Error,"file_prpcess.txt open failed: not exist");
+        //qDebug() << "日志文件不存在，可能是传输已完成或从未开始";
         return;
     }
 
     // 打开日志文件
     if (!log.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "无法打开日志文件：" << log.errorString();
+        LOG(Logger::Error,"file_prpcess.txt open failed:"+log.errorString());
+        //qDebug() << "无法打开日志文件：" << log.errorString();
         return;
     }
 
@@ -624,13 +636,7 @@ void ChatInfo::recoverFileProcess() {
     QString receiver = logData.value("receiver");
     qint64 sentSize = logData.value("sentSize").toLongLong();
     qint64 fileSize = logData.value("fileSize").toLongLong();
-    double progress = logData.value("progress").toDouble();
-
-    // 输出恢复的信息
-    qDebug() << "恢复传输信息：" << "发送状态：" << send << "是否群组：" << group
-             << "文件路径：" << filePath << "文件名：" << fileName << "发送者：" << sender
-             << "接收者：" << receiver << "已发送字节数：" << sentSize << "文件总大小："
-             << fileSize << "进度百分比：" << progress;
+    // double progress = logData.value("progress").toDouble();
     if(filehelper==nullptr&&fileThrd==nullptr){
         createFilehelper(send,group,filePath,fileName,sender,receiver,fileSize);
         filehelper->setSentSize(sentSize);

@@ -1,7 +1,8 @@
-#include "meetingroom.h"
-#include "ui_meetingroom.h"
 #include <QDebug>
 #include <QThread>
+#include "meetingroom.h"
+#include "ui_meetingroom.h"
+#include "logger.h"
 MeetingRoom::MeetingRoom(QString meetName,QString username,QString hostname,int meetingID,int mp,int vp,int mdp,QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::MeetingRoom)
@@ -124,16 +125,11 @@ void MeetingRoom::videoSet(QImage image)
 
 void MeetingRoom::onMsgReadyRead()
 {
-    // int len=ms->pendingDatagramSize();
-    // char msg[len];
-    // memset(msg,0,len);
-    // ms->readDatagram(msg,len);
-
-    // ui->textBrowser_msg->append(msg);
     QByteArray datagram;
     datagram.resize(ms->pendingDatagramSize());
     ms->readDatagram(datagram.data(), datagram.size());
     ui->textBrowser_msg->append(QString::fromUtf8(datagram));
+    LOG(Logger::Info,"receive meeting msg");
 }
 
 void MeetingRoom::on_pb_msgSend_clicked()
@@ -162,19 +158,12 @@ void MeetingRoom::on_pb_invite_clicked()
 
 void MeetingRoom::closeEvent(QCloseEvent *event)
 {
-    //qDebug()<<"close room";
     emit meetingRoomClose(); // 发出信号
     event->ignore(); // 阻止窗口关闭的默认行为
 }
 
 void MeetingRoom::videoRecoverInit()
 {
-    // vs->bind(QHostAddress::AnyIPv4,vp,QAbstractSocket::ReuseAddressHint);
-    // vs->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption,300*2048);//设置udp缓冲区
-    // bool ret=vs->joinMulticastGroup(QHostAddress("224.0.1.0"));//组播地址
-    // if(!ret){
-    //     qDebug()<<vs->error();
-    // }
     recover = new VideoRecover(vp);
     vrecvThread = new QThread(this);
     recover ->moveToThread(vrecvThread);
@@ -187,12 +176,6 @@ void MeetingRoom::videoRecoverInit()
 
 void MeetingRoom::videoSenderInit()
 {
-    // vs->bind(QHostAddress::AnyIPv4,vp,QAbstractSocket::ReuseAddressHint);
-    // vs->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption,300*2048);//设置udp缓冲区
-    // bool ret=vs->joinMulticastGroup(QHostAddress("224.0.1.0"));//组播地址
-    // if(!ret){
-    //     qDebug()<<vs->error();.
-    //  }
     sender = new VideoSender(vp);
     vsendThread = new QThread(this);
     sender->moveToThread(vsendThread);
@@ -207,10 +190,7 @@ void MeetingRoom::on_CB_cremaSet_stateChanged(int arg1) {
     if (arg1 == Qt::Checked) {
         // 停止接收线程
         if (vrecvThread) {
-            qDebug() << "recv thread stop";
             if(vrecvThread->isRunning()){
-
-                qDebug() << "call recv thread stop";
                 emit stopVideoRecv();
                 vrecvThread->wait();
             }
@@ -224,14 +204,14 @@ void MeetingRoom::on_CB_cremaSet_stateChanged(int arg1) {
             camera = new CameraHandler(this);
             connect(camera, &CameraHandler::getImage, this, &MeetingRoom::onGetImage);
             if (!sender) { // 初始化
-                qDebug() << "send thread start";
+                LOG(Logger::Info,"open cramer");
                 videoSenderInit();
             }
         }
     } else {
         // 停止发送线程
         if (vsendThread) {
-            qDebug() << "send thread stop";
+            LOG(Logger::Info,"close cramer");
             if(vsendThread->isRunning()){
                 emit stopVideoSender();
                 vsendThread->wait();
@@ -243,7 +223,6 @@ void MeetingRoom::on_CB_cremaSet_stateChanged(int arg1) {
         }
         // 开启接收线程
         if (!vrecvThread) {
-            qDebug() << "recv thread start";
             videoRecoverInit();
         }
         delete camera;

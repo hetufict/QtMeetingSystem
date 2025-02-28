@@ -1,5 +1,6 @@
-#include "videosender.h"
 #include <QVariant>
+#include "videosender.h"
+#include "logger.h"
 struct ImagePackage {
     int width;          // 宽度
     int height;         // 高度
@@ -15,23 +16,20 @@ VideoSender::VideoSender(int port,QObject *parent)
 {
     socket=new QUdpSocket(this);
     socket->bind(QHostAddress::AnyIPv4,port,QAbstractSocket::ReuseAddressHint);
-    //socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption,300*2048);//设置udp缓冲区
     socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, QVariant(300 * 2048));
     bool ret=socket->joinMulticastGroup(QHostAddress("224.0.1.0"));//组播地址
     if(!ret){
-        qDebug()<<socket->error();
+        LOG(Logger::Error,"vedio socket:"+socket->error());
     }
 }
 
 void VideoSender::sendeVideo(QImage image)
 {
-    //static int i=0;
     int unitBytes = 1024;
     int byteCount = image.sizeInBytes(); //图片大小
     int width = image.width();
     int height = image.height();
     int bytePerLine = image.bytesPerLine();
-    //qDebug()<<"bytesCount:"<<byteCount<<" width&height"<<width<<","<<height<<"bytePerLine:"<<bytePerLine;
     int writeBytes = 0; //已写入大小
 
     while(true)
@@ -56,13 +54,10 @@ void VideoSender::sendeVideo(QImage image)
                 pack.isLastPack = false;
                 pack.packTaken = unitBytes; //设置当前包中数据的大小
             }
-            //qDebug()<<image.size()<<"writeBytes:"<<writeBytes<<"taken"<<pack.packTaken<<"count"<<byteCount;
             socket->writeDatagram((char*)&pack,sizeof(ImagePackage),QHostAddress("224.0.1.0"),port);
         }
         else
         {
-            //if(++i%30==0)
-                //qDebug()<<i<<image.size()<<"writeBytes:"<<writeBytes<<"taken"<<pack.packTaken<<"count"<<byteCount;
             break;
         }
     }

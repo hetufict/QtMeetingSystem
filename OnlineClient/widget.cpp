@@ -1,8 +1,9 @@
-#include "widget.h"
-#include "./ui_widget.h"
 #include <QMessageBox>
 #include <QDebug>
 #include <QDir>
+#include "widget.h"
+#include "./ui_widget.h"
+#include "logger.h"
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget)
@@ -46,7 +47,6 @@ void Widget::on_pb_login_clicked()
     username=name;
     //发送
     pack.sendMsg(socket);
-    // qDebug()<<"name:"<<pack.getStringValue("name")<<" pswd:"<<pack.getStringValue("pswd");
 }
 
 
@@ -66,6 +66,7 @@ void Widget::on_pb_register_clicked()
     pack.addValue("pswd",pswd);
     //发送
     pack.sendMsg(socket);
+    LOG(Logger::Info,"User "+name+"register requset");
 }
 
 void Widget::resultHandler(const MessagePackage &pack)
@@ -94,7 +95,6 @@ void Widget::resultHandler(const MessagePackage &pack)
     }
     else if(pack.Type()==MessagePackage::Key_Type_GroupChat)
     {
-        // qDebug()<<"get group chat pack";
         emit receiveGroupChat(pack);
     }
     else if(pack.Type()==MessagePackage::Key_Type_GetGroupMembers)
@@ -103,7 +103,6 @@ void Widget::resultHandler(const MessagePackage &pack)
     }
     else if(pack.Type()==MessagePackage::Key_Type_FileOK)//发送文件的结果回复
     {
-        qDebug()<<"sender:"<<pack.getStringValue(MessagePackage::Key_Sender);
         if(pack.getStringValue(MessagePackage::Key_Sender)==usrMenu->getUsername())
         {
             emit sendFileRespond(pack);//发送私聊文件成功
@@ -168,6 +167,7 @@ void Widget::loginResultHandler(const MessagePackage &pack)
         usrMenu=new UsrMenu(this,socket,username);
         connect(usrMenu, &UsrMenu::usrMenuClosed, this, &Widget::onUserMenuClosed);
         QMessageBox::information(this,"登陆成功","登陆成功");
+        LOG(Logger::Info,"user: "+username+"+login");
         QDir dir("./fileData/"+username);
         if (!dir.exists()) {
             if (!dir.mkpath(".")) {
@@ -183,14 +183,17 @@ void Widget::loginResultHandler(const MessagePackage &pack)
     else if(pack.getIntValue("result")==2)
     {
         QMessageBox::warning(this,"登陆失败","登陆失败，账号密码重复，不能重复登陆");
+        LOG(Logger::Info,"user: "+username+"+login failed: repeated login");
     }
     else if(pack.getIntValue("result")==0)
     {
         QMessageBox::warning(this,"登陆失败","登陆失败，账号密码错误");
+        LOG(Logger::Info,"user: "+username+"+login failed: error login information");
     }
     else
     {
         QMessageBox::warning(this,"登陆失败","502");
+        LOG(Logger::Error,"user: "+username+"+login failed: error unkonw error");
     }
 }
 
@@ -199,10 +202,12 @@ void Widget::registerResultHandler(const MessagePackage &pack)
     if(pack.getIntValue("result"))
     {
         QMessageBox::information(this,"注册","注册成功");
+        LOG(Logger::Info,"user: "+pack.getStringValue(MessagePackage::Key_Name) +" register success");
     }
     else
     {
         QMessageBox::warning(this,"注册失败","注册失败，账号已存在");
+        LOG(Logger::Info,"user: "+pack.getStringValue(MessagePackage::Key_Name)+" register faild: existed uesr");
     }
 }
 

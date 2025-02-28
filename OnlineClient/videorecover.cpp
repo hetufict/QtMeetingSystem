@@ -1,6 +1,7 @@
+#include <QVariant>
 #include "videorecover.h"
 #include "QCoreApplication"
-#include <QVariant>
+#include "logger.h"
 VideoRecover::VideoRecover(int port,QObject *parent)
     : QObject{parent},socket(socket),port(port)
 {
@@ -9,12 +10,11 @@ VideoRecover::VideoRecover(int port,QObject *parent)
     socket->setSocketOption(QAbstractSocket::SendBufferSizeSocketOption, QVariant(300 * 2048));
     bool ret=socket->joinMulticastGroup(QHostAddress("224.0.1.0"));//组播地址
     if(!ret){
-        qDebug()<<socket->error();
+        LOG(Logger::Error,"vedio socket:"+socket->error());
     }
 }
 void VideoRecover::onReadyRead()
 {
-    //static int i=0;
     qDebug()<<1;
     QByteArray *imageBytes = new QByteArray(4000000,0);
     QDataStream *dataStream = new QDataStream(imageBytes,QIODevice::ReadWrite);

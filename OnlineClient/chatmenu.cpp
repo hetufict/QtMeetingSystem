@@ -75,10 +75,6 @@ void ChatMenu::addMsgText(const QString &msg, bool isSelf) {
     ui->listWidget_dialogView->addItem(item);
 }
 
-void ChatMenu::addFile(const QString &filename)
-{
-
-}
 
 void ChatMenu::addGroupMembers(const QStringList &list)
 {

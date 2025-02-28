@@ -1,10 +1,11 @@
-#include "filehelper.h"
 #include <QFile>
 #include <QDebug>
-//#include "QCoreApplication"
 #include <QCoreApplication>
 #include <QVariant>
+#include "filehelper.h"
 #include "messagepackage.h"
+#include "logger.h"
+
 
 FileHelper::FileHelper(bool send, bool group, QString filePath, QString fileName, QString sender, QString recver, QObject *parent)
     : QObject{parent}, send(send), filePath(filePath), fileName(fileName), sender(sender), recver(recver), group(group), sentSize(0)
@@ -15,14 +16,14 @@ FileHelper::FileHelper(bool send, bool group, QString filePath, QString fileName
     {
         file=new QFile(filePath);
         if(!file->open(QIODevice::ReadOnly)){
-            qDebug()<<"无法打开文件"<<filePath<<" "<<file->errorString();
+            LOG(Logger::Error,"open file failed: "+filePath+file->errorString());
             return ;
         }
     }else{
         filePath=filePath+fileName;
         file=new QFile(filePath);
         if(!file->open(QIODevice::WriteOnly)){
-            qDebug()<<"无法打开文件"<<filePath<<" "<<file->errorString();
+            LOG(Logger::Error,"open file failed: "+filePath+file->errorString());
             return ;
         }
     }
@@ -44,8 +45,6 @@ FileHelper::FileHelper(bool send, bool group, QString filePath, QString fileName
 FileHelper::~FileHelper()
 {
     m_speedUpdateTimer->stop();
-    //emit transferSpeedUpdated(0.0,fileName,send); // 通知速率清零
-    qDebug()<<"XXXXXXXXXXXXXXfilehelper overXXXXXXXXXXXXX";
     if(file->isOpen()) file->close();
     if(log->isOpen())  log->close();
     //关闭套接字
@@ -77,18 +76,17 @@ void FileHelper::onCancelFile()
 void FileHelper::onPauseFile()
 {
     pause=!pause;
-    qDebug()<<"***********set pause:"<<pause;
+    LOG(Logger::Info,"set file process pause");
 }
 
 void FileHelper::resultHandler(MessagePackage &pack)
 {
     if(pack.Type()==MessagePackage::Key_Type_FilePos){//收到接受确认
-        //QThread::msleep(5);
         fileSend();//发送下一个包
     }else if(pack.Type()==MessagePackage::Key_Type_FileOK){
         // 删除日志文件
         if (!log->remove()) {
-            qDebug() << "无法删除日志文件" << logFileName << "错误：" << log->errorString();
+            LOG(Logger::Error,"remove file failed: "+logFileName+log->errorString());
         }
         emit fileSendFinished(pack);
     }else if(pack.Type()==MessagePackage::Key_Type_FILEDATA){
@@ -113,7 +111,6 @@ void FileHelper::fileSend()
         QCoreApplication::processEvents();
         //如果取消发送，关闭文件，清理申请的资源
         if(cancel){
-            qDebug()<<"cancel ------"<<fileName;
             fileUploadCancel();
             return;
         }
@@ -124,12 +121,14 @@ void FileHelper::fileSend()
     const int bufferSize=8192;
     // 检查套接字状态
     if (f_socket->state() != QAbstractSocket::ConnectedState) {
-        qDebug() << "Socket error:" << f_socket->error();
-        qDebug() << "Socket error string:" << f_socket->errorString();
+        LOG(Logger::Error, QString("Socket error: %1 Socket error string: %2")
+                .arg(f_socket->error()) // 将枚举值转换为字符串
+                .arg(f_socket->errorString()));
         return;
     }
     // 定位到当前文件指针位置
     if (!file->seek(sentSize)) {
+        LOG(Logger::Error,"file seek error: "+fileName+file->errorString());
         qDebug() << "无法定位到文件位置" << sentSize << "错误：" << file->errorString();
         return;
     }
@@ -138,6 +137,7 @@ void FileHelper::fileSend()
     int currentSize=std::min(bufferSize,(int)(totalSize-sentSize));
     buffer = file->read(currentSize);
     if (buffer.isEmpty()) {
+        LOG(Logger::Error,"read file failed: empty buffer");
         qDebug() << "文件读取错误";
         return;
     }
@@ -153,7 +153,11 @@ void FileHelper::fileSend()
     pack.addValue(MessagePackage::Key_SentSize,sentSize);//已经发送的文件大小
     pack.addValue(MessagePackage::key_FileSize,totalSize);//文件的总大小
     pack.sendMsg(f_socket);
-    qDebug()<<"buffer size:"<<buffer.size()<<"sent size: "<<sentSize<<" pack type:"<<pack.Type()<<" "<<f_socket->socketDescriptor();
+    LOG(Logger::Info, QString("buffer size: %1 sent size: %2 pack type: %3 socket descriptor: %4")
+                          .arg(buffer.size())
+                          .arg(sentSize)
+                          .arg(pack.Type())
+                          .arg(f_socket->socketDescriptor()));
 }
 //请求文件数据
 void FileHelper::fileRecv()
@@ -167,15 +171,14 @@ void FileHelper::fileRecv()
     pack.addValue(MessagePackage::Key_SentSize,sentSize);//已经发送的文件大小
     pack.addValue(MessagePackage::key_FileSize,fileSize);//文件的总大小
     pack.sendMsg(f_socket);
+    LOG(Logger::Info,"requset file pack");
 
 }
 
 void FileHelper::fileDownload(MessagePackage &pack)
 {
-    qDebug()<<"read file size:"<<pack.getIntValue(MessagePackage::Key_SentSize)<<"total size:"<<fileSize;
     //设置文件存储路径
     QByteArray fileData=pack.getFileValue(MessagePackage::key_FileData);
-    //qint64 filesize=pack.getIntValue(MessagePackage::key_FileSize);
     sentSize=pack.getIntValue(MessagePackage::Key_SentSize);
     // 写入数据
     file->seek(sentSize-fileData.size()); // 定位到文件的上次写入的位置
@@ -187,18 +190,16 @@ void FileHelper::fileDownload(MessagePackage &pack)
             QCoreApplication::processEvents();
             //如果取消发送，关闭文件，清理申请的资源
             if(cancel){
-                qDebug()<<"cancel ------"<<fileName;
                 fileUploadCancel();
                 return;
             }
-            //QThread::sleep(5);
         }
         fileRecv();//继续请求文件数据
     }
     else if (sentSize== fileSize){//如果文件上传完成
         // 删除日志文件
         if (!log->remove()) {
-            qDebug() << "无法删除日志文件" << logFileName << "错误：" << log->errorString();
+            LOG(Logger::Error,"remove file failed: "+logFileName+log->errorString());
         }
         emit fileSendFinished(pack);
     }
@@ -220,10 +221,9 @@ void FileHelper::fileUploadCancel()
 
     // 删除日志文件
     if (!log->remove()) {
-        qDebug() << "无法删除日志文件" << logFileName << "错误：" << log->errorString();
+        LOG(Logger::Error,"remove file failed: "+logFileName+log->errorString());
     }
     m_speedUpdateTimer->stop();
-    //emit transferSpeedUpdated(0.0,fileName,send); // 通知速率清零
 }
 
 void FileHelper::updateTransferSpeed() {
@@ -285,7 +285,7 @@ void FileHelper::initSocket() {
     f_socket->connectToHost(QHostAddress("127.0.0.1"), 8888);
     // 检查套接字状态
     if (!f_socket->waitForConnected(5000)) { // 等待5秒
-        qDebug() << "Connection failed:" << f_socket->errorString();
+        LOG(Logger::Error,"Connection failed :"+f_socket->errorString());
         return;
     }
 }

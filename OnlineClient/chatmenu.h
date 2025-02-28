@@ -19,7 +19,6 @@ public:
     //添加聊天信息到聊天窗口
     void addMsgText(const QString& msg);
     void addMsgText(const QString &msg, bool isSelf);
-    void addFile(const QString& filename);
     void addGroupMembers(const QStringList& list);
     void addFileList(const QStringList &filelist,const QStringList &senderlist);
     ~ChatMenu();

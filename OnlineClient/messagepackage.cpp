@@ -1,5 +1,7 @@
-#include "messagepackage.h"
 #include <QDebug>
+#include "messagepackage.h"
+#include "logger.h"
+
 QString MessagePackage::Key_Type_Login="user_login";
 QString MessagePackage::Key_Type_Logout="user_logout";
 QString MessagePackage::Key_Type_Register="user-register";
@@ -180,32 +182,8 @@ QByteArray MessagePackage::getFileValue(const QString& key) const {
     // 如果 key 不存在或值不是字符串类型，返回空的 QByteArray
     return QByteArray();
 }
+
 //发送协议包
-// void MessagePackage::sendMsg(QTcpSocket *socket)
-// {
-//     //json转成QByteArray用于发送
-//     QJsonDocument doc(m_data);
-//     QByteArray array=doc.toJson();
-//     //先发送长度，防止读取粘包的问题
-//     qint64 size=array.size();
-//     qDebug()<<"pack size:"<<size;
-//     socket->write((char*)&size,4);
-//     //再发送数据
-//     socket->write(array);
-// }
-
-// void MessagePackage::recvMsg(QTcpSocket *socket)
-// {
-//     //先读取长度，保证不对多读
-//     int len=0;
-//     socket->read((char*)&len,4);
-//     //再读取数据
-//     QByteArray arr=socket->read(len);
-//     //将数据转成json对象保存再类中
-//     m_data=QJsonDocument::fromJson(arr).object();
-// }
-
-
 void MessagePackage::sendMsg(QTcpSocket *socket) {
     if (!socket || socket->state() != QAbstractSocket::ConnectedState) {
         qDebug() << "Socket is not connected, cannot send data";
@@ -227,16 +205,17 @@ void MessagePackage::sendMsg(QTcpSocket *socket) {
     // 发送数据
     qint64 bytesWritten = socket->write(packet);
     if (bytesWritten == -1) {
-        qDebug() << "Failed to write data to socket:" << socket->errorString();
+        LOG(Logger::Error, "Failed to write data to socket: " + socket->errorString());
     } else if (bytesWritten < packet.size()) {
-        qDebug() << "Partial data written, expected:" << packet.size() << "actual:" << bytesWritten;
+        LOG(Logger::Error, QString("Partial data written, expected: %1, actual: %2")
+                .arg(packet.size()).arg(bytesWritten));
     } else {
-        qDebug() << "Data sent successfully, size:" << packet.size();
+        LOG(Logger::Info, QString("Data sent successfully, size: %1").arg(packet.size()));
     }
 
     // 确保数据写入底层网络缓冲区
     if (!socket->waitForBytesWritten(5000)) { // 超时5秒
-        qDebug() << "Failed to flush data to socket:" << socket->errorString();
+        LOG(Logger::Error,"Failed to flush data to socket:" + socket->errorString());
     }
 }
 
@@ -248,7 +227,7 @@ void MessagePackage::recvMsg(QTcpSocket *socket) {
     while (buffer.size() < 4) {
         QByteArray temp = socket->read(4 - buffer.size());
         if (temp.isEmpty()) {
-            qDebug() << "Failed to read size, connection might be closed or no data available";
+            LOG(Logger::Error,"Failed to read size, connection might be closed or no data available");
             return;
         }
         buffer.append(temp);
@@ -266,7 +245,7 @@ void MessagePackage::recvMsg(QTcpSocket *socket) {
     while (buffer.size() < len) {
         QByteArray temp = socket->read(len - buffer.size());
         if (temp.isEmpty()) {
-            qDebug() << "Failed to read data, connection might be closed or no data available";
+            LOG(Logger::Error,"Failed to read size, connection might be closed or no data available");
             return;
         }
         buffer.append(temp);

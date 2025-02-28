@@ -6,6 +6,7 @@
 #include "messagepackage.h"
 #include "usrmenu.h"
 #include "meetingroom.h"
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class Widget;

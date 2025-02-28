@@ -34,7 +34,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
         messagepackage.h messagepackage.cpp
-        usermenu.h usermenu.cpp usermenu.ui
+
         chatmenu.h chatmenu.cpp chatmenu.ui
         createmeetingdialog.h createmeetingdialog.cpp createmeetingdialog.ui
         meetingroom.h meetingroom.cpp meetingroom.ui
@@ -45,6 +45,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         usrmenu.h usrmenu.cpp usrmenu.ui
         meetiingmenu.h meetiingmenu.cpp meetiingmenu.ui
         chatinfo.h chatinfo.cpp chatinfo.ui
+        logger.h logger.cpp
 
 
 
